@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import LineasGeneticas from "./pages/LineasGeneticas";
 import Cajas from "./pages/Cajas";
 import Lotes from "./pages/Lotes";
+import Alertas from "./pages/Alertas";
+import Stock from "./pages/Stock";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +31,8 @@ const App = () => (
               <Route path="/lineas" element={<LineasGeneticas />} />
               <Route path="/cajas" element={<Cajas />} />
               <Route path="/lotes" element={<Lotes />} />
+              <Route path="/stock" element={<Stock />} />
+              <Route path="/alertas" element={<Alertas />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
