@@ -21,6 +21,7 @@ interface Lote {
   linea_genetica_id: string | null;
   caja_id: string | null;
   fecha_nacimiento: string;
+  fecha_nacimiento_original: string | null;
   fecha_introduccion_caja: string | null;
   cantidad_inicial: number | null;
   cantidad_actual: number | null;
