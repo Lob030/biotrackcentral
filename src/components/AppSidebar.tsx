@@ -1,4 +1,4 @@
-import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut } from "lucide-react";
+import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut, BellRing, Boxes } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -19,6 +19,8 @@ const items = [
   { title: "Líneas Genéticas", url: "/lineas", icon: GitBranch },
   { title: "Cajas", url: "/cajas", icon: Package },
   { title: "Lotes", url: "/lotes", icon: Layers },
+  { title: "Stock por tamaño", url: "/stock", icon: Boxes },
+  { title: "Alertas", url: "/alertas", icon: BellRing },
 ];
 
 export function AppSidebar() {
