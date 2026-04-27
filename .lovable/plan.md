@@ -1,61 +1,64 @@
-## Rediseñar página de Stock por tamaño
+## Siguientes pasos del plan inicial
 
-Combinar la tabla detallada de las imágenes (etapas con días y peso por especie) con el estilo actual (% y conteo de lotes, glass-card, gradiente primario).
+Ya están listos: Cloud + auth (email + Google), Líneas Genéticas, Cajas, Lotes (con división), Stock por tamaño y Alertas. Lo que sigue del alcance original son tres bloques: **administración de la organización/usuarios**, **eventos de lote** (registrar bajas, ventas, traslados) y un **historial/timeline** por lote.
 
-### 1. Ampliar el catálogo de etapas en `src/lib/etapas.ts`
+---
 
-Reemplazar las etapas actuales por las que aparecen en las imágenes, añadiendo `pesoMin` y `pesoMax` (en gramos):
+### 1. Administración de organización y usuarios
 
-**ASF** (7 etapas): Pinky 0–6d / 1–3g · Fuzzy 7–14d / 3–7g · Hopper 15–21d / 7–15g · Destetada 22–35d / 15–25g · Chico 36–50d / 25–40g · Mediano 51–70d / 40–60g · Grande 71+d / 60+g
+Nueva página `/admin` (visible solo para `role = 'admin'`):
 
-**Ratón** (7 etapas): Pinky 0–6d / 1–3g · Fuzzy 7–14d / 3–8g · Hopper 15–21d / 8–16g · Destetada 22–35d / 16–22g · Chico 35–50d / 22–30g · Mediano 51–70d / 30–45g · Grande 71+d / 45+g
+- **Datos de la organización**: editar `organizations.nombre`.
+- **Miembros**: listar perfiles del org con su rol (`admin` / `user`), permitir cambiar rol y enviar invitaciones por correo (signup link).
+- Enlace en el sidebar visible solo para admin.
 
-**Rata** (11 etapas): Pinky 0–6d / 0–16g · Fuzzy 6–10d / 16–30g · Hopper 10–19d / 31–50g · Destetada 19–27d / 51–70g · Chico 27–31d / 71–90g · Mediano 31–37d / 91–120g · Grande 37–43d / 121–150g · Extra Grande 43–49d / 151–200g · Jumbo 49–55d / 201–250g · Extra Jumbo 55–65d / 251–300g · Mega 65–75d / 301–349g · Extra Mega 75–100d / 350–400g · Ratota 100+d / 401+g
+Sin cambios de schema, ya existen `organizations`, `profiles`, `user_roles` con sus RLS.
 
-Marcar la fila Destetada con flag `etiqueta: "Destete"` para mostrar el sub-label visto en las imágenes.
+### 2. Eventos de lote (movimientos)
 
-`etapaActual()` se mantiene igual, ya que sigue funcionando con el rango días.
-
-### 2. Rediseñar `src/pages/Stock.tsx`
-
-Layout en **3 columnas** (responsive: 1 col móvil, 2 col tablet, 3 col desktop), una tarjeta `glass-card` por especie con tabla interna:
+Nueva tabla `lote_eventos` para registrar lo que le pasa a un lote sin perder trazabilidad:
 
 ```text
-┌─────────────────────────────┐
-│ 🧪 ASF                      │
-│    38 individuos en total   │
-├─────────────────────────────┤
-│ Etapa     Días    Peso  Stock│
-│ • Pinky   0–6d    1–3   [12]│
-│ • Fuzzy   7–14d   3–7    —  │
-│ • Destetada 22–35d 15–25 [12]│
-│   Destete (sub-label cyan)  │
-│ ...                         │
-└─────────────────────────────┘
+lote_eventos
+  id, organization_id, lote_id,
+  tipo: 'mortalidad' | 'venta' | 'traslado_caja' | 'ajuste' | 'separacion_sexo' | 'nota'
+  fecha, cantidad (int, puede ser 0 para nota/traslado),
+  caja_destino_id (nullable, solo para traslado),
+  precio_unitario (nullable, solo para venta),
+  notas, created_by, created_at
 ```
 
-Detalles de estilo (mantenidos del diseño actual):
-- Stock con valor: badge redondeado bg-primary/10 text-primary (mismo color que el % actual)
-- Stock vacío: guion `—` muted
-- Punto de color a la izquierda de cada etapa (cyan tenue si vacío, brillante si tiene stock)
-- Fila Destetada destacada con sub-label "Destete" en color accent
+- Trigger en BD que actualiza `lotes.cantidad_actual` automáticamente al insertar evento (resta en mortalidad/venta, suma en ajuste positivo).
+- RLS por `organization_id`.
 
-Header de la página:
-- Título "Stock de individuos"
-- Subtítulo: "Calculado automáticamente · {totalGlobal} individuos en inventario · Actualizado {hora}"
-- **Botón "Actualizar"** arriba derecha (ícono RefreshCw) que llama `queryClient.invalidateQueries(['lotes-stock'])` y refresca la marca de tiempo
-- **Banner informativo** (estilo glass con borde primary): "ℹ Stock calculado en tiempo real basado en lotes activos de tipo Nacimiento y Engorda. La etapa/tamaño se asigna automáticamente según la edad de cada lote desde su fecha de nacimiento."
+En la página `Lotes`, añadir en cada fila botones rápidos: **Mortalidad**, **Venta**, **Trasladar caja**. Cada uno abre un diálogo pequeño que crea el evento.
 
-### 3. Filtro por tipo de lote (aplicar la fórmula real)
+### 3. Historial / timeline del lote
 
-Filtrar la query a lotes con `estado='activo'` y `tipo IN ('nacimiento','engorda')` para que coincida con lo que dice el banner. El cálculo de etapa sigue usando `etapaActual(especie, fecha_nacimiento)`.
+Vista de detalle por lote (`/lotes/:id`) con:
 
-Estado vacío por especie: mensaje "Sin lotes activos de nacimiento o engorda para {especie}" centrado dentro de la tarjeta (como en la imagen de Ratón).
+- Datos del lote (especie, línea, caja, etapa actual, días).
+- Línea de tiempo vertical con todos los eventos ordenados por fecha (íconos diferenciados por tipo).
+- Resumen acumulado: bajas totales, ventas (cantidad y monto si hay precio), traslados.
 
-### Archivos a modificar
-- `src/lib/etapas.ts` — nuevas etapas con peso
-- `src/pages/Stock.tsx` — rediseño completo con tabla, botón Actualizar y banner
+Acceso desde la lista de lotes haciendo clic en el código.
 
-### Fuera de alcance
-- Tabs Todas / ASF / Ratón / Rata y Todas / Engorda / Reproductores que aparecen en la imagen (se pueden añadir después si los pides)
-- Edición de pesos por usuario
+---
+
+### Archivos a crear/modificar
+
+- `supabase/migrations/...sql` — tabla `lote_eventos`, enum `lote_evento_tipo`, trigger de actualización de `cantidad_actual`, RLS.
+- `src/pages/Admin.tsx` — gestión de org y miembros.
+- `src/pages/LoteDetalle.tsx` — vista detalle + timeline.
+- `src/components/EventoDialog.tsx` — diálogo reutilizable para registrar mortalidad/venta/traslado.
+- `src/pages/Lotes.tsx` — botones de evento en cada fila + link al detalle.
+- `src/components/AppSidebar.tsx` — entrada "Administración" condicionada a admin.
+- `src/App.tsx` — rutas nuevas.
+
+### Fuera de alcance (para después)
+
+- Reportes/exportar PDF o Excel.
+- Gráficas históricas (mortalidad por mes, ventas).
+- Notificaciones por correo de alertas.
+
+¿Procedo con los tres bloques o prefieres empezar solo por uno (por ejemplo, eventos de lote primero)?
