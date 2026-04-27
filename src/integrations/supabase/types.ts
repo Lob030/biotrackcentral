@@ -108,6 +108,48 @@ export type Database = {
           },
         ]
       }
+      lote_eventos: {
+        Row: {
+          caja_destino_id: string | null
+          cantidad: number
+          created_at: string
+          created_by: string | null
+          fecha: string
+          id: string
+          lote_id: string
+          notas: string | null
+          organization_id: string
+          precio_unitario: number | null
+          tipo: Database["public"]["Enums"]["lote_evento_tipo"]
+        }
+        Insert: {
+          caja_destino_id?: string | null
+          cantidad?: number
+          created_at?: string
+          created_by?: string | null
+          fecha?: string
+          id?: string
+          lote_id: string
+          notas?: string | null
+          organization_id: string
+          precio_unitario?: number | null
+          tipo: Database["public"]["Enums"]["lote_evento_tipo"]
+        }
+        Update: {
+          caja_destino_id?: string | null
+          cantidad?: number
+          created_at?: string
+          created_by?: string | null
+          fecha?: string
+          id?: string
+          lote_id?: string
+          notas?: string | null
+          organization_id?: string
+          precio_unitario?: number | null
+          tipo?: Database["public"]["Enums"]["lote_evento_tipo"]
+        }
+        Relationships: []
+      }
       lotes: {
         Row: {
           caja_id: string | null
@@ -300,6 +342,13 @@ export type Database = {
       caja_uso: "reproductor" | "engorda"
       especie_type: "ASF" | "Raton" | "Rata"
       lote_estado: "activo" | "dividido" | "finalizado"
+      lote_evento_tipo:
+        | "mortalidad"
+        | "venta"
+        | "traslado_caja"
+        | "ajuste"
+        | "separacion_sexo"
+        | "nota"
       lote_sexo: "machos" | "hembras" | "mixto"
       lote_tipo: "nacimiento" | "engorda" | "reproduccion"
     }
@@ -434,6 +483,14 @@ export const Constants = {
       caja_uso: ["reproductor", "engorda"],
       especie_type: ["ASF", "Raton", "Rata"],
       lote_estado: ["activo", "dividido", "finalizado"],
+      lote_evento_tipo: [
+        "mortalidad",
+        "venta",
+        "traslado_caja",
+        "ajuste",
+        "separacion_sexo",
+        "nota",
+      ],
       lote_sexo: ["machos", "hembras", "mixto"],
       lote_tipo: ["nacimiento", "engorda", "reproduccion"],
     },

@@ -11,8 +11,10 @@ import Dashboard from "./pages/Dashboard";
 import LineasGeneticas from "./pages/LineasGeneticas";
 import Cajas from "./pages/Cajas";
 import Lotes from "./pages/Lotes";
+import LoteDetalle from "./pages/LoteDetalle";
 import Alertas from "./pages/Alertas";
 import Stock from "./pages/Stock";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,8 +33,10 @@ const App = () => (
               <Route path="/lineas" element={<LineasGeneticas />} />
               <Route path="/cajas" element={<Cajas />} />
               <Route path="/lotes" element={<Lotes />} />
+              <Route path="/lotes/:id" element={<LoteDetalle />} />
               <Route path="/stock" element={<Stock />} />
               <Route path="/alertas" element={<Alertas />} />
+              <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
