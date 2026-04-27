@@ -17,7 +17,7 @@ import { Building2, Users, Save, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 
-type AppRole = "admin" | "user";
+type AppRole = "admin" | "trabajador";
 
 export default function Admin() {
   const { profile, role } = useAuth();
@@ -164,7 +164,7 @@ export default function Admin() {
                 )}
               </div>
               <Select
-                value={m.role ?? "user"}
+                value={m.role ?? "trabajador"}
                 onValueChange={(v: AppRole) =>
                   updateRole.mutate({ userId: m.id, newRole: v })
                 }
@@ -175,7 +175,7 @@ export default function Admin() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="user">Usuario</SelectItem>
+                  <SelectItem value="trabajador">Trabajador</SelectItem>
                 </SelectContent>
               </Select>
             </div>
