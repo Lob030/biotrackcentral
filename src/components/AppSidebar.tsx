@@ -1,4 +1,4 @@
-import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut, BellRing, Boxes } from "lucide-react";
+import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut, BellRing, Boxes, Shield } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
-const items = [
+const baseItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Líneas Genéticas", url: "/lineas", icon: GitBranch },
   { title: "Cajas", url: "/cajas", icon: Package },
@@ -26,6 +26,9 @@ const items = [
 export function AppSidebar() {
   const { profile, role, signOut } = useAuth();
   const location = useLocation();
+  const items = role === "admin"
+    ? [...baseItems, { title: "Administración", url: "/admin", icon: Shield }]
+    : baseItems;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">

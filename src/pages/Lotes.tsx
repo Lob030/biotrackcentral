@@ -9,9 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Scissors, GitFork } from "lucide-react";
+import { Plus, Pencil, Trash2, Scissors, GitFork, Skull, DollarSign, ArrowRightLeft, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
+import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
 
 interface Lote {
   id: string;
@@ -44,6 +46,8 @@ export default function Lotes() {
   const [open, setOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState<Lote | null>(null);
   const [editing, setEditing] = useState<Lote | null>(null);
+  const [eventoLote, setEventoLote] = useState<Lote | null>(null);
+  const [eventoTipo, setEventoTipo] = useState<EventoTipo>("mortalidad");
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
@@ -192,7 +196,9 @@ export default function Lotes() {
             <div key={l.id} className="glass-card p-5 flex items-center gap-4 flex-wrap group hover:border-primary/40 transition">
               <div className="flex-1 min-w-[200px]">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="display-font text-lg font-bold">{l.codigo || l.id.slice(0, 8)}</span>
+                  <Link to={`/lotes/${l.id}`} className="display-font text-lg font-bold hover:text-primary transition-colors">
+                    {l.codigo || l.id.slice(0, 8)}
+                  </Link>
                   {l.lote_padre_id && <Badge variant="outline" className="text-[10px] gap-1"><GitFork className="h-3 w-3" /> sub-lote</Badge>}
                   <Badge variant="outline" className="capitalize text-[10px]">{l.tipo}</Badge>
                   <Badge variant="outline" className="text-[10px]">{l.especie}</Badge>
@@ -214,12 +220,28 @@ export default function Lotes() {
               </div>
 
               <div className="flex flex-col gap-1.5">
+                {l.estado === "activo" && (
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" title="Mortalidad" onClick={() => { setEventoLote(l); setEventoTipo("mortalidad"); }}>
+                      <Skull className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-success/80 hover:text-success hover:bg-success/10" title="Venta" onClick={() => { setEventoLote(l); setEventoTipo("venta"); }}>
+                      <DollarSign className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-primary/80 hover:text-primary hover:bg-primary/10" title="Trasladar" onClick={() => { setEventoLote(l); setEventoTipo("traslado_caja"); }}>
+                      <ArrowRightLeft className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
                 {l.tipo === "nacimiento" && l.estado === "activo" && (
                   <Button size="sm" variant="outline" onClick={() => setSplitOpen(l)} className="border-primary/40 text-primary hover:bg-primary/10">
                     <Scissors className="h-3.5 w-3.5 mr-1" /> Dividir
                   </Button>
                 )}
                 <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver detalle" asChild>
+                    <Link to={`/lotes/${l.id}`}><Eye className="h-3.5 w-3.5" /></Link>
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
                   <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => { if (confirm("¿Eliminar lote?")) del.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
@@ -229,6 +251,8 @@ export default function Lotes() {
         })}
         {filtered.length === 0 && <div className="glass-card p-12 text-center text-muted-foreground">No hay lotes. <button onClick={openNew} className="text-primary hover:underline">Crear el primero</button></div>}
       </div>
+
+      <EventoDialog lote={eventoLote} tipo={eventoTipo} open={!!eventoLote} onClose={() => setEventoLote(null)} />
 
       {/* Form modal */}
       <Dialog open={open} onOpenChange={setOpen}>
