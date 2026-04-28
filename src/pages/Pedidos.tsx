@@ -80,6 +80,32 @@ export default function Pedidos() {
     queryFn: async () => (await supabase.from("clientes").select("id, nombre").eq("estado_cliente", "activo")).data ?? [],
   });
 
+  // Stock en vivo: suma cantidad_actual de lotes activos agrupados por especie+etapa (calculada).
+  const { data: stockMap = {} } = useQuery({
+    queryKey: ["stock-por-etapa"],
+    refetchInterval: 5000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lotes")
+        .select("especie, fecha_nacimiento, cantidad_actual, estado")
+        .eq("estado", "activo")
+        .gt("cantidad_actual", 0);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data ?? []).forEach((l: any) => {
+        const etapa = etapaActual(l.especie as Especie, l.fecha_nacimiento);
+        if (etapa === "—") return;
+        const key = `${l.especie}__${etapa}`;
+        map[key] = (map[key] ?? 0) + (l.cantidad_actual ?? 0);
+      });
+      return map;
+    },
+  });
+
+  const stockDe = (especie: Especie, etapa: string) => stockMap[`${especie}__${etapa}`] ?? 0;
+  const stockSeleccionado = newDetalle.etapa ? stockDe(newDetalle.especie, newDetalle.etapa) : null;
+  const excedeStock = stockSeleccionado !== null && newDetalle.cantidad > stockSeleccionado;
+
   const subtotal = detalles.reduce((acc, d) => acc + d.cantidad * d.precio_unitario, 0);
   const { total, descuento } = calcularTotales(subtotal);
 
