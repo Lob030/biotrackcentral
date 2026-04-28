@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Trash2, Trash, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Trash, Eye, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { ETAPAS, calcularTotales, obtenerPrecio, type Especie } from "@/lib/etapas";
+import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } from "@/lib/etapas";
 
 interface Pedido {
   id: string;
@@ -79,6 +79,32 @@ export default function Pedidos() {
     queryKey: ["clientes-options"],
     queryFn: async () => (await supabase.from("clientes").select("id, nombre").eq("estado_cliente", "activo")).data ?? [],
   });
+
+  // Stock en vivo: suma cantidad_actual de lotes activos agrupados por especie+etapa (calculada).
+  const { data: stockMap = {} } = useQuery({
+    queryKey: ["stock-por-etapa"],
+    refetchInterval: 5000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lotes")
+        .select("especie, fecha_nacimiento, cantidad_actual, estado")
+        .eq("estado", "activo")
+        .gt("cantidad_actual", 0);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data ?? []).forEach((l: any) => {
+        const etapa = etapaActual(l.especie as Especie, l.fecha_nacimiento);
+        if (etapa === "—") return;
+        const key = `${l.especie}__${etapa}`;
+        map[key] = (map[key] ?? 0) + (l.cantidad_actual ?? 0);
+      });
+      return map;
+    },
+  });
+
+  const stockDe = (especie: Especie, etapa: string) => stockMap[`${especie}__${etapa}`] ?? 0;
+  const stockSeleccionado = newDetalle.etapa ? stockDe(newDetalle.especie, newDetalle.etapa) : null;
+  const excedeStock = stockSeleccionado !== null && newDetalle.cantidad > stockSeleccionado;
 
   const subtotal = detalles.reduce((acc, d) => acc + d.cantidad * d.precio_unitario, 0);
   const { total, descuento } = calcularTotales(subtotal);
@@ -181,6 +207,11 @@ export default function Pedidos() {
   const agregarDetalle = () => {
     if (!newDetalle.etapa || newDetalle.cantidad <= 0) {
       toast.error("Selecciona etapa y cantidad");
+      return;
+    }
+    const disponible = stockDe(newDetalle.especie, newDetalle.etapa);
+    if (newDetalle.cantidad > disponible) {
+      toast.error(`No hay suficiente stock. Disponibles: ${disponible} unidades`);
       return;
     }
     const precio = newDetalle.precio_unitario || obtenerPrecio(newDetalle.especie, newDetalle.etapa);
@@ -334,11 +365,18 @@ export default function Pedidos() {
                     <Select value={newDetalle.etapa} onValueChange={onChangeEtapa}>
                       <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>
-                        {(ETAPAS[newDetalle.especie] ?? []).map((e) => (
-                          <SelectItem key={e.nombre} value={e.nombre}>
-                            {e.nombre} · ${e.precio.toFixed(2)}
-                          </SelectItem>
-                        ))}
+                        {(ETAPAS[newDetalle.especie] ?? []).map((e) => {
+                          const stk = stockDe(newDetalle.especie, e.nombre);
+                          const sin = stk <= 0;
+                          return (
+                            <SelectItem key={e.nombre} value={e.nombre}>
+                              <span className={sin ? "text-destructive line-through" : ""}>
+                                {e.nombre} · ${e.precio.toFixed(2)}
+                                {sin ? " (sin stock)" : ` · ${stk}u`}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -346,7 +384,7 @@ export default function Pedidos() {
                     <Label className="text-xs">Cantidad</Label>
                     <Input type="number" min={1} value={newDetalle.cantidad}
                       onChange={(e) => setNewDetalle({ ...newDetalle, cantidad: parseInt(e.target.value) || 1 })}
-                      className="h-9" />
+                      className={`h-9 ${excedeStock ? "border-destructive focus-visible:ring-destructive" : ""}`} />
                   </div>
                   <div className="col-span-2">
                     <Label className="text-xs">Precio U.</Label>
@@ -355,9 +393,27 @@ export default function Pedidos() {
                       className="h-9" />
                   </div>
                   <div className="col-span-1">
-                    <Button onClick={agregarDetalle} size="icon" className="h-9 w-9"><Plus className="h-4 w-4" /></Button>
+                    <Button onClick={agregarDetalle} disabled={excedeStock || !newDetalle.etapa} size="icon" className="h-9 w-9"><Plus className="h-4 w-4" /></Button>
                   </div>
                 </div>
+
+                {/* Stock en vivo + validación */}
+                {newDetalle.etapa && (
+                  <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Stock disponible:</span>
+                      <span className={`display-font font-bold text-lg ${stockSeleccionado && stockSeleccionado > 0 ? "text-success" : "text-destructive"}`}>
+                        {stockSeleccionado ?? 0} unidades
+                      </span>
+                    </div>
+                    {excedeStock && (
+                      <div className="flex items-center gap-1.5 text-destructive text-sm">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>No hay suficiente stock. Disponibles: {stockSeleccionado} unidades</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {detalles.length > 0 && (
