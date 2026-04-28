@@ -365,11 +365,18 @@ export default function Pedidos() {
                     <Select value={newDetalle.etapa} onValueChange={onChangeEtapa}>
                       <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>
-                        {(ETAPAS[newDetalle.especie] ?? []).map((e) => (
-                          <SelectItem key={e.nombre} value={e.nombre}>
-                            {e.nombre} · ${e.precio.toFixed(2)}
-                          </SelectItem>
-                        ))}
+                        {(ETAPAS[newDetalle.especie] ?? []).map((e) => {
+                          const stk = stockDe(newDetalle.especie, e.nombre);
+                          const sin = stk <= 0;
+                          return (
+                            <SelectItem key={e.nombre} value={e.nombre}>
+                              <span className={sin ? "text-destructive line-through" : ""}>
+                                {e.nombre} · ${e.precio.toFixed(2)}
+                                {sin ? " (sin stock)" : ` · ${stk}u`}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -377,7 +384,7 @@ export default function Pedidos() {
                     <Label className="text-xs">Cantidad</Label>
                     <Input type="number" min={1} value={newDetalle.cantidad}
                       onChange={(e) => setNewDetalle({ ...newDetalle, cantidad: parseInt(e.target.value) || 1 })}
-                      className="h-9" />
+                      className={`h-9 ${excedeStock ? "border-destructive focus-visible:ring-destructive" : ""}`} />
                   </div>
                   <div className="col-span-2">
                     <Label className="text-xs">Precio U.</Label>
@@ -386,9 +393,27 @@ export default function Pedidos() {
                       className="h-9" />
                   </div>
                   <div className="col-span-1">
-                    <Button onClick={agregarDetalle} size="icon" className="h-9 w-9"><Plus className="h-4 w-4" /></Button>
+                    <Button onClick={agregarDetalle} disabled={excedeStock || !newDetalle.etapa} size="icon" className="h-9 w-9"><Plus className="h-4 w-4" /></Button>
                   </div>
                 </div>
+
+                {/* Stock en vivo + validación */}
+                {newDetalle.etapa && (
+                  <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Stock disponible:</span>
+                      <span className={`display-font font-bold text-lg ${stockSeleccionado && stockSeleccionado > 0 ? "text-success" : "text-destructive"}`}>
+                        {stockSeleccionado ?? 0} unidades
+                      </span>
+                    </div>
+                    {excedeStock && (
+                      <div className="flex items-center gap-1.5 text-destructive text-sm">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>No hay suficiente stock. Disponibles: {stockSeleccionado} unidades</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {detalles.length > 0 && (
