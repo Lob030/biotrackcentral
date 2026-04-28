@@ -61,6 +61,74 @@ export type Database = {
           },
         ]
       }
+      clientes: {
+        Row: {
+          ciudad: string | null
+          codigo_postal: string | null
+          contacto_principal: string | null
+          created_at: string
+          direccion: string | null
+          email: string | null
+          estado: string | null
+          estado_cliente: Database["public"]["Enums"]["cliente_estado"]
+          id: string
+          nombre: string
+          notas: string | null
+          organization_id: string
+          pais: string | null
+          rfc: string | null
+          telefono: string | null
+          tipo_cliente: Database["public"]["Enums"]["cliente_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          ciudad?: string | null
+          codigo_postal?: string | null
+          contacto_principal?: string | null
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          estado?: string | null
+          estado_cliente?: Database["public"]["Enums"]["cliente_estado"]
+          id?: string
+          nombre: string
+          notas?: string | null
+          organization_id: string
+          pais?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          tipo_cliente?: Database["public"]["Enums"]["cliente_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          ciudad?: string | null
+          codigo_postal?: string | null
+          contacto_principal?: string | null
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          estado?: string | null
+          estado_cliente?: Database["public"]["Enums"]["cliente_estado"]
+          id?: string
+          nombre?: string
+          notas?: string | null
+          organization_id?: string
+          pais?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          tipo_cliente?: Database["public"]["Enums"]["cliente_tipo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lineas_geneticas: {
         Row: {
           color_etiqueta: string | null
@@ -266,6 +334,119 @@ export type Database = {
         }
         Relationships: []
       }
+      pedidos: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          estado: Database["public"]["Enums"]["pedido_estado"]
+          fecha_entrega_realizada: string | null
+          fecha_entrega_solicitada: string | null
+          fecha_pedido: string
+          id: string
+          monto_descuento: number
+          notas: string | null
+          numero_pedido: string
+          organization_id: string
+          porcentaje_descuento: number
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          estado?: Database["public"]["Enums"]["pedido_estado"]
+          fecha_entrega_realizada?: string | null
+          fecha_entrega_solicitada?: string | null
+          fecha_pedido?: string
+          id?: string
+          monto_descuento?: number
+          notas?: string | null
+          numero_pedido: string
+          organization_id: string
+          porcentaje_descuento?: number
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          estado?: Database["public"]["Enums"]["pedido_estado"]
+          fecha_entrega_realizada?: string | null
+          fecha_entrega_solicitada?: string | null
+          fecha_pedido?: string
+          id?: string
+          monto_descuento?: number
+          notas?: string | null
+          numero_pedido?: string
+          organization_id?: string
+          porcentaje_descuento?: number
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos_detalles: {
+        Row: {
+          cantidad: number
+          created_at: string
+          especie: string
+          etapa: string
+          id: string
+          pedido_id: string
+          precio_unitario: number
+          subtotal: number | null
+          updated_at: string
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string
+          especie: string
+          etapa: string
+          id?: string
+          pedido_id: string
+          precio_unitario?: number
+          subtotal?: number | null
+          updated_at?: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          especie?: string
+          etapa?: string
+          id?: string
+          pedido_id?: string
+          precio_unitario?: number
+          subtotal?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_detalles_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -340,6 +521,12 @@ export type Database = {
       app_role: "admin" | "trabajador"
       caja_estado: "libre" | "ocupada" | "limpieza"
       caja_uso: "reproductor" | "engorda"
+      cliente_estado: "activo" | "inactivo" | "bloqueado"
+      cliente_tipo:
+        | "general"
+        | "laboratorio"
+        | "centro_investigacion"
+        | "veterinario"
       especie_type: "ASF" | "Raton" | "Rata"
       lote_estado: "activo" | "dividido" | "finalizado"
       lote_evento_tipo:
@@ -351,6 +538,13 @@ export type Database = {
         | "nota"
       lote_sexo: "machos" | "hembras" | "mixto"
       lote_tipo: "nacimiento" | "engorda" | "reproduccion"
+      pedido_estado:
+        | "pendiente"
+        | "confirmado"
+        | "en_preparacion"
+        | "listo"
+        | "entregado"
+        | "cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -481,6 +675,13 @@ export const Constants = {
       app_role: ["admin", "trabajador"],
       caja_estado: ["libre", "ocupada", "limpieza"],
       caja_uso: ["reproductor", "engorda"],
+      cliente_estado: ["activo", "inactivo", "bloqueado"],
+      cliente_tipo: [
+        "general",
+        "laboratorio",
+        "centro_investigacion",
+        "veterinario",
+      ],
       especie_type: ["ASF", "Raton", "Rata"],
       lote_estado: ["activo", "dividido", "finalizado"],
       lote_evento_tipo: [
@@ -493,6 +694,14 @@ export const Constants = {
       ],
       lote_sexo: ["machos", "hembras", "mixto"],
       lote_tipo: ["nacimiento", "engorda", "reproduccion"],
+      pedido_estado: [
+        "pendiente",
+        "confirmado",
+        "en_preparacion",
+        "listo",
+        "entregado",
+        "cancelado",
+      ],
     },
   },
 } as const
