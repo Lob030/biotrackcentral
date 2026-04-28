@@ -15,6 +15,8 @@ import LoteDetalle from "./pages/LoteDetalle";
 import Alertas from "./pages/Alertas";
 import Stock from "./pages/Stock";
 import Admin from "./pages/Admin";
+import Clientes from "./pages/Clientes";
+import Pedidos from "./pages/Pedidos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ const App = () => (
               <Route path="/lotes" element={<Lotes />} />
               <Route path="/lotes/:id" element={<LoteDetalle />} />
               <Route path="/stock" element={<Stock />} />
+              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/pedidos" element={<Pedidos />} />
               <Route path="/alertas" element={<Alertas />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
