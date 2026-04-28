@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Trash2, Trash, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Trash, Eye, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { ETAPAS, calcularTotales, obtenerPrecio, type Especie } from "@/lib/etapas";
+import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } from "@/lib/etapas";
 
 interface Pedido {
   id: string;
