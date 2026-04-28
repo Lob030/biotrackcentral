@@ -209,6 +209,11 @@ export default function Pedidos() {
       toast.error("Selecciona etapa y cantidad");
       return;
     }
+    const disponible = stockDe(newDetalle.especie, newDetalle.etapa);
+    if (newDetalle.cantidad > disponible) {
+      toast.error(`No hay suficiente stock. Disponibles: ${disponible} unidades`);
+      return;
+    }
     const precio = newDetalle.precio_unitario || obtenerPrecio(newDetalle.especie, newDetalle.etapa);
     setDetalles([...detalles, { ...newDetalle, precio_unitario: precio }]);
     setNewDetalle({ especie: newDetalle.especie, etapa: "", cantidad: 1, precio_unitario: 0 });
