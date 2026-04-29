@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import GastosTab from "@/components/GastosTab";
 import {
   BarChart2,
   DollarSign,
@@ -555,7 +556,14 @@ export default function Ventas() {
           <Placeholder titulo="Mejores Clientes" />
         </TabsContent>
         <TabsContent value="gastos" className="mt-6">
-          <Placeholder titulo="Gestión de Gastos" />
+          <GastosTab
+            periodo={{
+              start: r.start,
+              end: r.end,
+              label: periodoLabel,
+              tipo: periodo === "anio" ? "anio" : periodo,
+            }}
+          />
         </TabsContent>
         <TabsContent value="proyecciones" className="mt-6">
           <Placeholder titulo="Proyecciones" />
