@@ -230,7 +230,7 @@ export default function Ventas() {
     });
     let productos = [...prodMap.values()];
     if (topEspecie !== "todas") productos = productos.filter((p) => p.especie === topEspecie);
-    productos = productos
+    const productosFinal = productos
       .sort((a, b) => (topMetric === "unidades" ? b.unidades - a.unidades : b.ingreso - a.ingreso))
       .slice(0, 10)
       .map((p) => ({
@@ -270,7 +270,7 @@ export default function Ventas() {
       numPedidos,
       numPedidosPrev,
       bucketRows,
-      productos,
+      productos: productosFinal,
       especies,
       recientes,
     };
