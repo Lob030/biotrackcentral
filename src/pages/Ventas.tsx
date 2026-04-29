@@ -224,7 +224,7 @@ export default function Ventas() {
         const key = `${d.especie}__${d.etapa}`;
         const cur = prodMap.get(key) ?? { especie: d.especie, etapa: d.etapa, unidades: 0, ingreso: 0 };
         cur.unidades += Number(d.cantidad || 0);
-        cur.ingreso += Number(d.subtotal ?? d.cantidad * d.precio_unitario ?? 0);
+        cur.ingreso += Number(d.subtotal ?? (Number(d.cantidad) * Number(d.precio_unitario)) ?? 0);
         prodMap.set(key, cur);
       });
     });
@@ -245,7 +245,7 @@ export default function Ventas() {
       (p.pedidos_detalles ?? []).forEach((d: any) => {
         const cur = espMap.get(d.especie) ?? { unidades: 0, ingreso: 0 };
         cur.unidades += Number(d.cantidad || 0);
-        cur.ingreso += Number(d.subtotal ?? d.cantidad * d.precio_unitario ?? 0);
+        cur.ingreso += Number(d.subtotal ?? (Number(d.cantidad) * Number(d.precio_unitario)) ?? 0);
         espMap.set(d.especie, cur);
       });
     });
