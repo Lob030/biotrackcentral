@@ -556,7 +556,14 @@ export default function Ventas() {
           <Placeholder titulo="Mejores Clientes" />
         </TabsContent>
         <TabsContent value="gastos" className="mt-6">
-          <Placeholder titulo="Gestión de Gastos" />
+          <GastosTab
+            periodo={{
+              start: r.start,
+              end: r.end,
+              label: periodoLabel,
+              tipo: periodo === "anio" ? "anio" : periodo,
+            }}
+          />
         </TabsContent>
         <TabsContent value="proyecciones" className="mt-6">
           <Placeholder titulo="Proyecciones" />
