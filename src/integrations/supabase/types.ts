@@ -129,6 +129,59 @@ export type Database = {
           },
         ]
       }
+      gastos: {
+        Row: {
+          categoria: string
+          created_at: string
+          descripcion: string
+          fecha: string
+          id: string
+          monto: number
+          notas: string | null
+          organization_id: string
+          proveedor: string | null
+          recurrente: boolean
+          subcategoria: string | null
+          updated_at: string
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          descripcion: string
+          fecha?: string
+          id?: string
+          monto?: number
+          notas?: string | null
+          organization_id: string
+          proveedor?: string | null
+          recurrente?: boolean
+          subcategoria?: string | null
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          descripcion?: string
+          fecha?: string
+          id?: string
+          monto?: number
+          notas?: string | null
+          organization_id?: string
+          proveedor?: string | null
+          recurrente?: boolean
+          subcategoria?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gastos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lineas_geneticas: {
         Row: {
           color_etiqueta: string | null

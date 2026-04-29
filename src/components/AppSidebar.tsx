@@ -1,4 +1,4 @@
-import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut, BellRing, Boxes, Shield, Users, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut, BellRing, Boxes, Shield, Users, ShoppingCart, BarChart2 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -22,6 +22,7 @@ const baseItems = [
   { title: "Stock por tamaño", url: "/stock", icon: Boxes },
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Pedidos", url: "/pedidos", icon: ShoppingCart },
+  { title: "Ventas & Analytics", url: "/ventas", icon: BarChart2 },
   { title: "Alertas", url: "/alertas", icon: BellRing },
 ];
 
