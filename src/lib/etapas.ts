@@ -59,6 +59,18 @@ export function etapaActual(especie: Especie, fechaNacimiento: string): string {
   return etapas.find((e) => dias >= e.diasMin && dias <= e.diasMax)?.nombre ?? "—";
 }
 
+// Días que faltan para que un lote llegue al inicio de una etapa.
+// Negativo o 0 = ya alcanzó/superó esa etapa. null = etapa desconocida.
+export function diasParaEtapa(
+  fechaNacimientoLote: string,
+  especie: Especie,
+  nombreEtapa: string,
+): number | null {
+  const etapa = (ETAPAS[especie] ?? []).find((e) => e.nombre === nombreEtapa);
+  if (!etapa) return null;
+  return etapa.diasMin - diasDesde(fechaNacimientoLote);
+}
+
 // Helpers de formato para la UI
 export function rangoDias(e: Etapa): string {
   if (e.diasMax >= 9999) return `${e.diasMin}–∞d`;
