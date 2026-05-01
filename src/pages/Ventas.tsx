@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import GastosTab from "@/components/GastosTab";
+import MejoresClientesTab from "@/components/MejoresClientesTab";
 import {
   BarChart2,
   DollarSign,
@@ -553,7 +554,7 @@ export default function Ventas() {
         </TabsContent>
 
         <TabsContent value="clientes" className="mt-6">
-          <Placeholder titulo="Mejores Clientes" />
+          <MejoresClientesTab periodo={{ start: r.start, end: r.end, label: periodoLabel }} />
         </TabsContent>
         <TabsContent value="gastos" className="mt-6">
           <GastosTab

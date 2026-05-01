@@ -16,6 +16,7 @@ import Alertas from "./pages/Alertas";
 import Stock from "./pages/Stock";
 import Admin from "./pages/Admin";
 import Clientes from "./pages/Clientes";
+import ClientePerfil from "./pages/ClientePerfil";
 import Pedidos from "./pages/Pedidos";
 import Ventas from "./pages/Ventas";
 import NotFound from "./pages/NotFound";
@@ -39,6 +40,7 @@ const App = () => (
               <Route path="/lotes/:id" element={<LoteDetalle />} />
               <Route path="/stock" element={<Stock />} />
               <Route path="/clientes" element={<Clientes />} />
+              <Route path="/clientes/:id" element={<ClientePerfil />} />
               <Route path="/pedidos" element={<Pedidos />} />
               <Route path="/ventas" element={<Ventas />} />
               <Route path="/alertas" element={<Alertas />} />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Trash2, Mail, Phone, MapPin } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 
@@ -42,6 +43,7 @@ const ESTADOS = [
 
 export default function Clientes() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState("all");
@@ -189,7 +191,11 @@ export default function Clientes() {
           const tipo = TIPOS_CLIENTE.find((t) => t.value === c.tipo_cliente);
           const estado = ESTADOS.find((e) => e.value === c.estado_cliente);
           return (
-            <div key={c.id} className="glass-card p-5 group hover:border-primary/40 transition">
+            <div
+              key={c.id}
+              onClick={() => navigate(`/clientes/${c.id}`)}
+              className="glass-card p-5 group hover:border-primary/40 transition cursor-pointer"
+            >
               <div className="flex items-start justify-between gap-2 mb-4">
                 <div className="flex-1 min-w-0">
                   <h3 className="display-font text-lg font-bold truncate">{c.nombre}</h3>
@@ -203,7 +209,8 @@ export default function Clientes() {
                     </Badge>
                   </div>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" title="Ver perfil" onClick={() => navigate(`/clientes/${c.id}`)}><Eye className="h-3.5 w-3.5" /></Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => { if (confirm("¿Eliminar cliente?")) del.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
