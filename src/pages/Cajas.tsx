@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 interface Caja {
@@ -80,7 +81,7 @@ export default function Cajas() {
       setEditing(null);
       toast.success(editing ? "Caja actualizada" : "Caja creada");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const del = useMutation({
@@ -89,7 +90,7 @@ export default function Cajas() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["cajas"] }); toast.success("Caja eliminada"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const openNew = () => {

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 export type EventoTipo = "mortalidad" | "venta" | "traslado_caja" | "ajuste" | "nota";
 
@@ -120,7 +121,7 @@ export default function EventoDialog({ lote, tipo, open, onClose }: EventoDialog
       toast.success("Evento registrado");
       onClose();
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   if (!lote) return null;
