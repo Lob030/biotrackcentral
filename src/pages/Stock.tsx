@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ETAPAS, etapaActual, rangoDias, rangoPeso, type Especie } from "@/lib/etapas";
 import { Boxes, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ProyeccionDisponibilidad from "@/components/ProyeccionDisponibilidad";
 
 const ESPECIES: Especie[] = ["ASF", "Raton", "Rata"];
 
@@ -213,6 +214,9 @@ export default function Stock() {
           );
         })}
       </div>
+
+      {/* Proyección de disponibilidad por tamaño */}
+      <ProyeccionDisponibilidad />
     </div>
   );
 }
