@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import {
   Bar,
   BarChart,
@@ -195,7 +196,7 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
       setOpen(false);
       setForm(blankForm());
     },
-    onError: (e: any) => toast.error(e.message ?? "Error al guardar"),
+    onError: (e: any) => toast.error(friendlyError(e, "Error al guardar")),
   });
 
   const deleteMut = useMutation({
@@ -214,7 +215,7 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
       qc.invalidateQueries({ queryKey: ["ventas-gastos"] });
       toast.success("Gasto eliminado");
     },
-    onError: (e: any) => toast.error(e.message ?? "Error al eliminar"),
+    onError: (e: any) => toast.error(friendlyError(e, "Error al eliminar")),
   });
 
   // procesado

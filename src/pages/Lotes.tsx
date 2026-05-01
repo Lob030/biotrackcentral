@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Scissors, GitFork, Skull, DollarSign, ArrowRightLeft, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { Link } from "react-router-dom";
 import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
 import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
@@ -110,7 +111,7 @@ export default function Lotes() {
       setOpen(false); setEditing(null);
       toast.success(editing ? "Lote actualizado" : "Lote creado");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const del = useMutation({
@@ -119,7 +120,7 @@ export default function Lotes() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["lotes"] }); toast.success("Lote eliminado"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const openNew = () => {
@@ -382,7 +383,7 @@ function DividirLoteModal({ lote, onClose, cajas }: { lote: Lote | null; onClose
       onClose();
       setMachos(""); setHembras(""); setCajaMachos(""); setCajaHembras("");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   if (!lote) return null;

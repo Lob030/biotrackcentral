@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 const COLORS = ["#06b6d4", "#10b981", "#a855f7", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899", "#f97316", "#14b8a6", "#8b5cf6"];
 
@@ -80,7 +81,7 @@ export default function LineasGeneticas() {
       setEditing(null);
       toast.success(editing ? "Línea actualizada" : "Línea creada");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const del = useMutation({
@@ -92,7 +93,7 @@ export default function LineasGeneticas() {
       qc.invalidateQueries({ queryKey: ["lineas"] });
       toast.success("Línea eliminada");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const openNew = () => {

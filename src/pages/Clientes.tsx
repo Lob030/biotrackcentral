@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Mail, Phone, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 interface Cliente {
   id: string;
@@ -102,7 +103,7 @@ export default function Clientes() {
       setEditing(null);
       toast.success(editing ? "Cliente actualizado" : "Cliente creado");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const del = useMutation({
@@ -114,7 +115,7 @@ export default function Clientes() {
       qc.invalidateQueries({ queryKey: ["clientes"] });
       toast.success("Cliente eliminado");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const openNew = () => {

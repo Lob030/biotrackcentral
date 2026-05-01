@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Trash, Eye, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } from "@/lib/etapas";
 
 interface Pedido {
@@ -159,7 +160,7 @@ export default function Pedidos() {
       resetForm();
       toast.success(editing ? "Pedido actualizado" : "Pedido creado");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const del = useMutation({
@@ -171,7 +172,7 @@ export default function Pedidos() {
       qc.invalidateQueries({ queryKey: ["pedidos"] });
       toast.success("Pedido eliminado");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const resetForm = () => {

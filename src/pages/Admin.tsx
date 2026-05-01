@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Building2, Users, Save, Shield } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { Navigate } from "react-router-dom";
 
 type AppRole = "admin" | "trabajador";
@@ -75,7 +76,7 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ["org"] });
       toast.success("Organización actualizada");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   const updateRole = useMutation({
@@ -91,7 +92,7 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ["org-miembros"] });
       toast.success("Rol actualizado");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(friendlyError(e)),
   });
 
   if (role !== "admin") return <Navigate to="/" replace />;
