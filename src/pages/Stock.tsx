@@ -214,6 +214,9 @@ export default function Stock() {
           );
         })}
       </div>
+
+      {/* Proyección de disponibilidad por tamaño */}
+      <ProyeccionDisponibilidad />
     </div>
   );
 }
