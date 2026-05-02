@@ -374,16 +374,28 @@ export type Database = {
           created_at: string
           id: string
           nombre: string
+          nombre_bioterio: string | null
+          plan: string
+          plan_expira_en: string | null
+          plan_gratis_trial: boolean
         }
         Insert: {
           created_at?: string
           id?: string
           nombre: string
+          nombre_bioterio?: string | null
+          plan?: string
+          plan_expira_en?: string | null
+          plan_gratis_trial?: boolean
         }
         Update: {
           created_at?: string
           id?: string
           nombre?: string
+          nombre_bioterio?: string | null
+          plan?: string
+          plan_expira_en?: string | null
+          plan_gratis_trial?: boolean
         }
         Relationships: []
       }
@@ -496,6 +508,44 @@ export type Database = {
             columns: ["pedido_id"]
             isOneToOne: false
             referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_historial: {
+        Row: {
+          cambiado_por: string | null
+          created_at: string
+          id: string
+          motivo: string | null
+          organization_id: string
+          plan_anterior: string | null
+          plan_nuevo: string
+        }
+        Insert: {
+          cambiado_por?: string | null
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          organization_id: string
+          plan_anterior?: string | null
+          plan_nuevo: string
+        }
+        Update: {
+          cambiado_por?: string | null
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          organization_id?: string
+          plan_anterior?: string | null
+          plan_nuevo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_historial_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
