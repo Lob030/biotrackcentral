@@ -19,6 +19,7 @@ import Clientes from "./pages/Clientes";
 import ClientePerfil from "./pages/ClientePerfil";
 import Pedidos from "./pages/Pedidos";
 import Ventas from "./pages/Ventas";
+import MasterPanel from "./pages/MasterPanel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/ventas" element={<Ventas />} />
               <Route path="/alertas" element={<Alertas />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/master" element={<MasterPanel />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
