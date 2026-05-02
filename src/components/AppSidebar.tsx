@@ -27,11 +27,14 @@ const baseItems = [
 ];
 
 export function AppSidebar() {
-  const { profile, role, signOut } = useAuth();
+  const { profile, role, signOut, isSuperAdmin } = useAuth();
   const location = useLocation();
-  const items = role === "admin"
+  let items = role === "admin" || isSuperAdmin
     ? [...baseItems, { title: "Administración", url: "/admin", icon: Shield }]
     : baseItems;
+  if (isSuperAdmin) {
+    items = [...items, { title: "Panel Maestro", url: "/master", icon: Shield }];
+  }
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
