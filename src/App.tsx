@@ -20,6 +20,8 @@ import ClientePerfil from "./pages/ClientePerfil";
 import Pedidos from "./pages/Pedidos";
 import Ventas from "./pages/Ventas";
 import MasterPanel from "./pages/MasterPanel";
+import LandingPage from "./pages/LandingPage";
+import PublicRoute from "./components/PublicRoute";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,9 +34,10 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
             <Route path="/auth" element={<Auth />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/lineas" element={<LineasGeneticas />} />
               <Route path="/cajas" element={<Cajas />} />
               <Route path="/lotes" element={<Lotes />} />
