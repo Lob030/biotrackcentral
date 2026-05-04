@@ -95,7 +95,7 @@ export default function Admin() {
     onError: (e: any) => toast.error(friendlyError(e)),
   });
 
-  if (role !== "admin") return <Navigate to="/" replace />;
+  if (role !== "admin") return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto animate-fade-in space-y-6">
