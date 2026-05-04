@@ -169,7 +169,7 @@ export default function MasterPanel() {
   }, [orgs, search, filterPlan, profilesByOrg]);
 
   if (loading) return null;
-  if (!isSuperAdmin) return <Navigate to="/" replace />;
+  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="space-y-6">

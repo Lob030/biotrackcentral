@@ -30,7 +30,7 @@ export default function Auth() {
   const [suPwd, setSuPwd] = useState("");
 
   useEffect(() => {
-    if (!loading && user) navigate("/", { replace: true });
+    if (!loading && user) navigate("/dashboard", { replace: true });
   }, [user, loading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -40,7 +40,7 @@ export default function Auth() {
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Bienvenido");
-    navigate("/", { replace: true });
+    navigate("/dashboard", { replace: true });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -57,7 +57,7 @@ export default function Auth() {
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Cuenta creada");
-    navigate("/", { replace: true });
+    navigate("/dashboard", { replace: true });
   };
 
   const handleGoogle = async () => {
