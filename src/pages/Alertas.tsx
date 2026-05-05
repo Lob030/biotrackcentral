@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { generarAlertas, type AlertaSeveridad } from "@/lib/alertas";
-import { AlertTriangle, AlertCircle, Info, BellRing, ArrowRight, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, AlertCircle, Info, BellRing, ArrowRight, CheckCircle2, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import AdministrarAlertasModal from "@/components/AdministrarAlertasModal";
 
 const severityConfig: Record<AlertaSeveridad, { icon: any; cls: string; label: string; iconCls: string }> = {
   critical: {
