@@ -14,6 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
+      alertas_personalizadas: {
+        Row: {
+          activa: boolean
+          cada_x_dias: number | null
+          condicion_operador: string | null
+          condicion_referencia: string | null
+          condicion_tipo: string | null
+          condicion_valor_1: number | null
+          condicion_valor_2: number | null
+          created_at: string
+          created_by: string | null
+          emoji: string
+          fecha_dia_mes: number | null
+          fecha_tipo: string | null
+          fecha_unica: string | null
+          id: string
+          mensaje: string
+          nombre: string
+          organization_id: string
+          se_repite: boolean
+          tipo: string
+          ultima_generacion: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          cada_x_dias?: number | null
+          condicion_operador?: string | null
+          condicion_referencia?: string | null
+          condicion_tipo?: string | null
+          condicion_valor_1?: number | null
+          condicion_valor_2?: number | null
+          created_at?: string
+          created_by?: string | null
+          emoji?: string
+          fecha_dia_mes?: number | null
+          fecha_tipo?: string | null
+          fecha_unica?: string | null
+          id?: string
+          mensaje: string
+          nombre: string
+          organization_id: string
+          se_repite?: boolean
+          tipo: string
+          ultima_generacion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          cada_x_dias?: number | null
+          condicion_operador?: string | null
+          condicion_referencia?: string | null
+          condicion_tipo?: string | null
+          condicion_valor_1?: number | null
+          condicion_valor_2?: number | null
+          created_at?: string
+          created_by?: string | null
+          emoji?: string
+          fecha_dia_mes?: number | null
+          fecha_tipo?: string | null
+          fecha_unica?: string | null
+          id?: string
+          mensaje?: string
+          nombre?: string
+          organization_id?: string
+          se_repite?: boolean
+          tipo?: string
+          ultima_generacion?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      alertas_sistema_config: {
+        Row: {
+          activa: boolean
+          alerta_key: string
+          created_at: string
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          alerta_key: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          alerta_key?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cajas: {
         Row: {
           capacidad: number | null
