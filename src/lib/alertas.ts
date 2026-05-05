@@ -98,5 +98,7 @@ export function generarAlertas(
 
   // ordenar por severidad
   const peso = { critical: 0, warning: 1, info: 2 };
-  return alertas.sort((a, b) => peso[a.severidad] - peso[b.severidad]);
+  return alertas
+    .filter((a) => !desactivadas.has(a.tipo))
+    .sort((a, b) => peso[a.severidad] - peso[b.severidad]);
 }
