@@ -23,7 +23,11 @@ const DIAS_DESTETE: Record<Especie, number> = {
 // Días desde introducción a engorda para considerar "listo"
 const DIAS_ENGORDA_LISTO = 60;
 
-export function generarAlertas(lotes: any[], cajas: any[]): Alerta[] {
+export function generarAlertas(
+  lotes: any[],
+  cajas: any[],
+  desactivadas: Set<string> = new Set(),
+): Alerta[] {
   const alertas: Alerta[] = [];
 
   for (const lote of lotes) {
