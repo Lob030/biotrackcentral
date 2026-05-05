@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { generarAlertas, type AlertaSeveridad } from "@/lib/alertas";
-import { AlertTriangle, AlertCircle, Info, BellRing, ArrowRight, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, AlertCircle, Info, BellRing, ArrowRight, CheckCircle2, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import AdministrarAlertasModal from "@/components/AdministrarAlertasModal";
 
 const severityConfig: Record<AlertaSeveridad, { icon: any; cls: string; label: string; iconCls: string }> = {
   critical: {
@@ -27,6 +30,8 @@ const severityConfig: Record<AlertaSeveridad, { icon: any; cls: string; label: s
 };
 
 export default function Alertas() {
+  const [adminOpen, setAdminOpen] = useState(false);
+
   const { data: lotes = [] } = useQuery({
     queryKey: ["lotes-alertas"],
     queryFn: async () => {
@@ -45,7 +50,20 @@ export default function Alertas() {
     },
   });
 
-  const alertas = generarAlertas(lotes, cajas);
+  const { data: desactivadasArr = [] } = useQuery({
+    queryKey: ["alertas-desactivadas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("alertas_sistema_config")
+        .select("alerta_key, activa")
+        .eq("activa", false);
+      if (error) throw error;
+      return (data ?? []).map((d: any) => d.alerta_key);
+    },
+  });
+
+  const desactivadas = new Set(desactivadasArr);
+  const alertas = generarAlertas(lotes, cajas, desactivadas);
   const criticas = alertas.filter((a) => a.severidad === "critical").length;
   const warnings = alertas.filter((a) => a.severidad === "warning").length;
   const infos = alertas.filter((a) => a.severidad === "info").length;
@@ -60,7 +78,14 @@ export default function Alertas() {
           </h1>
           <p className="text-muted-foreground mt-1">Revisión automática de lotes y cajas que requieren acción</p>
         </div>
+        <Button variant="outline" onClick={() => setAdminOpen(true)}>
+          <Settings2 className="h-4 w-4 mr-2" />
+          Administrar alertas
+        </Button>
       </div>
+
+      <AdministrarAlertasModal open={adminOpen} onOpenChange={setAdminOpen} />
+
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="stat-card">
