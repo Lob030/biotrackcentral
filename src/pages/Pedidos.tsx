@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } from "@/lib/etapas";
 import { useClienteOptionsActivos } from "@/data/options";
+import { invalidatePedidos } from "@/lib/invalidations";
 
 interface Pedido {
   id: string;
@@ -152,7 +153,7 @@ export default function Pedidos() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pedidos"] });
+      invalidatePedidos(qc);
       setOpen(false);
       setEditing(null);
       resetForm();
@@ -167,7 +168,7 @@ export default function Pedidos() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pedidos"] });
+      invalidatePedidos(qc);
       toast.success("Pedido eliminado");
     },
     onError: (e: any) => toast.error(friendlyError(e)),
