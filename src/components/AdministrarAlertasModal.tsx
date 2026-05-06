@@ -36,6 +36,7 @@ import { Pencil, Trash2, Plus, Settings2, Sparkles, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { ALERTAS_SISTEMA } from "@/lib/alertasSistema";
 import { ETAPAS } from "@/lib/etapas";
+import { invalidateAlertasPersonalizadas, invalidateAlertasSistema } from "@/lib/invalidations";
 
 interface Props {
   open: boolean;
