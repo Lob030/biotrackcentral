@@ -115,10 +115,10 @@ export default function Cajas() {
 
   return (
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+      <div className="page-header">
         <div>
-          <h1 className="display-font text-4xl font-bold tracking-tight">Cajas</h1>
-          <p className="text-muted-foreground mt-1">{cajas.length} cajas · {stats.ocupadas} ocupadas · {stats.libres} libres</p>
+          <h1 className="page-title">Cajas</h1>
+          <p className="page-subtitle">{cajas.length} cajas · {stats.ocupadas} ocupadas · {stats.libres} libres</p>
         </div>
         <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
           <Plus className="h-4 w-4 mr-1" /> Nueva caja
