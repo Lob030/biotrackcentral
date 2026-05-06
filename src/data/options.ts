@@ -67,6 +67,7 @@ export function useCajaOptions(opts?: { includeEstado?: boolean; enabled?: boole
     queryKey: [...cajasKeys.options(), { includeEstado: !!opts?.includeEstado }],
     queryFn: () => fetchCajaOptions({ includeEstado: opts?.includeEstado }),
     enabled: opts?.enabled,
+    staleTime: OPTIONS_STALE_TIME,
   });
 }
 
@@ -75,6 +76,7 @@ export function useLineaGeneticaOptions(opts?: { enabled?: boolean }) {
     queryKey: lineasKeys.options(),
     queryFn: fetchLineaGeneticaOptions,
     enabled: opts?.enabled,
+    staleTime: OPTIONS_STALE_TIME,
   });
 }
 
@@ -83,5 +85,6 @@ export function useClienteOptionsActivos(opts?: { enabled?: boolean }) {
     queryKey: [...clientesKeys.all, "options", "activos"] as const,
     queryFn: fetchClienteOptionsActivos,
     enabled: opts?.enabled,
+    staleTime: OPTIONS_STALE_TIME,
   });
 }
