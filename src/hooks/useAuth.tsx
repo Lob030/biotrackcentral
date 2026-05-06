@@ -120,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(null);
     setOrganization(null);
     setIsSuperAdmin(false);
+    // Drop any cached data from the previous user so it can't leak into the next session
+    qc.clear();
   };
 
   return (
