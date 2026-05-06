@@ -17,6 +17,7 @@ import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
 import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
 import { useCajaOptions, useLineaGeneticaOptions } from "@/data/options";
 import { useLotesList } from "@/data/lotes";
+import { invalidateLotes } from "@/lib/invalidations";
 
 interface Lote {
   id: string;
