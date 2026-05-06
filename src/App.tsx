@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -6,55 +7,100 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import PageLoader from "@/components/PageLoader";
+import RoleRoute from "@/components/RoleRoute";
+import PublicRoute from "./components/PublicRoute";
+
+// Eager — small + on the critical path
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import LineasGeneticas from "./pages/LineasGeneticas";
-import Cajas from "./pages/Cajas";
-import Lotes from "./pages/Lotes";
-import LoteDetalle from "./pages/LoteDetalle";
-import Alertas from "./pages/Alertas";
-import Stock from "./pages/Stock";
-import Admin from "./pages/Admin";
-import Clientes from "./pages/Clientes";
-import ClientePerfil from "./pages/ClientePerfil";
-import Pedidos from "./pages/Pedidos";
-import Ventas from "./pages/Ventas";
-import MasterPanel from "./pages/MasterPanel";
-import LandingPage from "./pages/LandingPage";
-import PublicRoute from "./components/PublicRoute";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Lazy — heavier or rarely-first-visit pages.
+// Code-splits the bundle so the initial load stays small.
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const LineasGeneticas = lazy(() => import("./pages/LineasGeneticas"));
+const Cajas = lazy(() => import("./pages/Cajas"));
+const Lotes = lazy(() => import("./pages/Lotes"));
+const LoteDetalle = lazy(() => import("./pages/LoteDetalle"));
+const Alertas = lazy(() => import("./pages/Alertas"));
+const Stock = lazy(() => import("./pages/Stock"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const ClientePerfil = lazy(() => import("./pages/ClientePerfil"));
+const Pedidos = lazy(() => import("./pages/Pedidos"));
+const Ventas = lazy(() => import("./pages/Ventas"));
+const MasterPanel = lazy(() => import("./pages/MasterPanel"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Reasonable defaults for an internal CRUD app:
+      // - Avoid refetch storms on tab focus
+      // - Cache data 30s before considering stale
+      // - Single retry on transient network errors
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
+
+const withSuspense = (node: React.ReactNode) => (
+  <Suspense fallback={<PageLoader />}>{node}</Suspense>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
-            <Route path="/auth" element={<Auth />} />
-            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/lineas" element={<LineasGeneticas />} />
-              <Route path="/cajas" element={<Cajas />} />
-              <Route path="/lotes" element={<Lotes />} />
-              <Route path="/lotes/:id" element={<LoteDetalle />} />
-              <Route path="/stock" element={<Stock />} />
-              <Route path="/clientes" element={<Clientes />} />
-              <Route path="/clientes/:id" element={<ClientePerfil />} />
-              <Route path="/pedidos" element={<Pedidos />} />
-              <Route path="/ventas" element={<Ventas />} />
-              <Route path="/alertas" element={<Alertas />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/master" element={<MasterPanel />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <PublicRoute>{withSuspense(<LandingPage />)}</PublicRoute>
+                }
+              />
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/lineas" element={withSuspense(<LineasGeneticas />)} />
+                <Route path="/cajas" element={withSuspense(<Cajas />)} />
+                <Route path="/lotes" element={withSuspense(<Lotes />)} />
+                <Route path="/lotes/:id" element={withSuspense(<LoteDetalle />)} />
+                <Route path="/stock" element={withSuspense(<Stock />)} />
+                <Route path="/clientes" element={withSuspense(<Clientes />)} />
+                <Route path="/clientes/:id" element={withSuspense(<ClientePerfil />)} />
+                <Route path="/pedidos" element={withSuspense(<Pedidos />)} />
+                <Route path="/ventas" element={withSuspense(<Ventas />)} />
+                <Route path="/alertas" element={withSuspense(<Alertas />)} />
+                <Route
+                  path="/admin"
+                  element={
+                    <RoleRoute allow={["admin"]}>{withSuspense(<Admin />)}</RoleRoute>
+                  }
+                />
+                <Route
+                  path="/master"
+                  element={
+                    <RoleRoute allow={[]}>{withSuspense(<MasterPanel />)}</RoleRoute>
+                  }
+                />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );
