@@ -157,32 +157,49 @@ export default function Cajas() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((c) => (
-          <div key={c.id} className="glass-card p-5 group">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="display-font text-xl font-bold">{c.codigo}</h3>
-                <p className="text-xs text-muted-foreground capitalize">{c.uso}</p>
+      {cajasQuery.error ? (
+        <ErrorState error={cajasQuery.error} onRetry={() => cajasQuery.refetch()} />
+      ) : cajasQuery.isLoading ? (
+        <CardGridSkeleton count={6} />
+      ) : (
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ${cajasQuery.isFetching ? "opacity-70" : ""}`}>
+          {filtered.map((c) => (
+            <div key={c.id} className="glass-card p-5 group">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="display-font text-xl font-bold">{c.codigo}</h3>
+                  <p className="text-xs text-muted-foreground capitalize">{c.uso}</p>
+                </div>
+                <span className={cn("text-[10px] px-2 py-1 rounded-full border capitalize font-medium", ESTADO_COLORS[c.estado])}>{c.estado}</span>
               </div>
-              <span className={cn("text-[10px] px-2 py-1 rounded-full border capitalize font-medium", ESTADO_COLORS[c.estado])}>{c.estado}</span>
+              {c.ubicacion && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-2">
+                  <MapPin className="h-3.5 w-3.5 text-primary" /> {c.ubicacion}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">Capacidad: {c.capacidad ?? "—"}</p>
+              <div className="border-t border-border/60 mt-4 pt-3 flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition">
+                <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5 mr-1" /> Editar</Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { if (confirm("¿Eliminar caja?")) del.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar</Button>
+              </div>
             </div>
-            {c.ubicacion && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-2">
-                <MapPin className="h-3.5 w-3.5 text-primary" /> {c.ubicacion}
-              </p>
-            )}
-            <p className="text-sm text-muted-foreground">Capacidad: {c.capacidad ?? "—"}</p>
-            <div className="border-t border-border/60 mt-4 pt-3 flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition">
-              <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5 mr-1" /> Editar</Button>
-              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { if (confirm("¿Eliminar caja?")) del.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar</Button>
+          ))}
+          {filtered.length === 0 && (
+            <div className="col-span-full">
+              <EmptyState
+                icon={Package}
+                title="No hay cajas"
+                description="No se encontraron cajas con los filtros seleccionados."
+                action={
+                  <Button onClick={openNew} variant="outline">
+                    <Plus className="h-4 w-4 mr-1" /> Crear una caja
+                  </Button>
+                }
+              />
             </div>
-          </div>
-        ))}
-        {filtered.length === 0 && (
-          <div className="col-span-full glass-card p-12 text-center text-muted-foreground">No hay cajas. <button onClick={openNew} className="text-primary hover:underline">Crear una</button></div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[500px]">
