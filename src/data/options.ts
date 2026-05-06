@@ -15,6 +15,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cajasKeys, lineasKeys, clientesKeys } from "@/lib/queryKeys";
 
+// Options/lookup lists rarely change during a session — keep them fresh
+// for 5 minutes so opening dialogs feels instant and doesn't refetch on
+// every mount.
+const OPTIONS_STALE_TIME = 5 * 60 * 1000;
+
 export interface CajaOption {
   id: string;
   codigo: string;
