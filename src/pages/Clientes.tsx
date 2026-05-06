@@ -245,7 +245,7 @@ export default function Clientes() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => upsert.mutate()} disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
+            <Button onClick={submit} disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
               {editing ? "Guardar" : "Crear cliente"}
             </Button>
           </DialogFooter>
