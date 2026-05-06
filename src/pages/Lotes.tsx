@@ -105,7 +105,7 @@ export default function Lotes() {
       const { error } = await supabase.from("lotes").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lotes"] }); toast.success("Lote eliminado"); },
+    onSuccess: () => { invalidateLotes(qc); toast.success("Lote eliminado"); },
     onError: (e: any) => toast.error(friendlyError(e)),
   });
 
