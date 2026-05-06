@@ -522,33 +522,33 @@ export default function Ventas() {
             {procesado.recientes.length === 0 ? (
               <EmptyState mensaje="No hay pedidos en este periodo" />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-2 px-2">
+                <table className="w-full text-sm min-w-[680px]">
                   <thead>
-                    <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                      <th className="py-2 pr-3">N°</th>
-                      <th className="py-2 pr-3">Cliente</th>
-                      <th className="py-2 pr-3">Fecha</th>
-                      <th className="py-2 pr-3">Productos</th>
-                      <th className="py-2 pr-3 text-right">Subtotal</th>
-                      <th className="py-2 pr-3 text-right">Desc.</th>
-                      <th className="py-2 pr-3 text-right">Total</th>
-                      <th className="py-2 pr-3">Estado</th>
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border/70">
+                      <th className="py-2.5 pr-3 font-semibold">N°</th>
+                      <th className="py-2.5 pr-3 font-semibold">Cliente</th>
+                      <th className="py-2.5 pr-3 font-semibold">Fecha</th>
+                      <th className="py-2.5 pr-3 font-semibold">Productos</th>
+                      <th className="py-2.5 pr-3 font-semibold text-right">Subtotal</th>
+                      <th className="py-2.5 pr-3 font-semibold text-right">Desc.</th>
+                      <th className="py-2.5 pr-3 font-semibold text-right">Total</th>
+                      <th className="py-2.5 pr-3 font-semibold">Estado</th>
                     </tr>
                   </thead>
                   <tbody>
                     {procesado.recientes.map((p: any) => (
-                      <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 pr-3 font-mono text-xs">{p.numero_pedido}</td>
-                        <td className="py-2 pr-3 truncate max-w-[180px]">{clientesMap?.[p.cliente_id] ?? "—"}</td>
-                        <td className="py-2 pr-3 text-muted-foreground">{p.fecha_pedido}</td>
-                        <td className="py-2 pr-3 text-muted-foreground">{(p.pedidos_detalles ?? []).length}</td>
-                        <td className="py-2 pr-3 text-right">{fmtMoney(Number(p.subtotal || 0))}</td>
-                        <td className="py-2 pr-3 text-right text-muted-foreground">
+                      <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-2.5 pr-3 font-mono text-xs">{p.numero_pedido}</td>
+                        <td className="py-2.5 pr-3 truncate max-w-[180px]">{clientesMap?.[p.cliente_id] ?? "—"}</td>
+                        <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">{p.fecha_pedido}</td>
+                        <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">{(p.pedidos_detalles ?? []).length}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums">{fmtMoney(Number(p.subtotal || 0))}</td>
+                        <td className="py-2.5 pr-3 text-right text-muted-foreground tabular-nums">
                           {Number(p.monto_descuento) > 0 ? `-${fmtMoney(Number(p.monto_descuento))}` : "—"}
                         </td>
-                        <td className="py-2 pr-3 text-right font-semibold">{fmtMoney(Number(p.total || 0))}</td>
-                        <td className="py-2 pr-3">
+                        <td className="py-2.5 pr-3 text-right font-semibold tabular-nums">{fmtMoney(Number(p.total || 0))}</td>
+                        <td className="py-2.5 pr-3">
                           <Badge variant="outline" className={`${ESTADO_BADGE[p.estado] ?? ""} text-[10px] capitalize`}>
                             {p.estado.replace("_", " ")}
                           </Badge>
