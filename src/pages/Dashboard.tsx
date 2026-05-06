@@ -1,11 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Activity, Layers, Package, FlaskConical, GitBranch, Calendar, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
 import { Badge } from "@/components/ui/badge";
 import { useLotesList } from "@/data/lotes";
+import { useCajasList } from "@/data/cajas";
 
 function StatCard({ icon: Icon, label, value, sublabel, iconClass }: any) {
   return (
@@ -27,14 +26,7 @@ export default function Dashboard() {
 
   const { data: lotes = [] } = useLotesList({ estado: "activo" });
 
-  const { data: cajas = [] } = useQuery({
-    queryKey: ["cajas-dash"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("cajas").select("*");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { data: cajas = [] } = useCajasList();
 
   const totalIndividuos = lotes.reduce((s, l: any) => s + (l.cantidad_actual || 0), 0);
   const lotesNacimiento = lotes.filter((l: any) => l.tipo === "nacimiento").length;
