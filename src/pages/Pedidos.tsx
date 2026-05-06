@@ -14,6 +14,7 @@ import { friendlyError } from "@/lib/errors";
 import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } from "@/lib/etapas";
 import { useClienteOptionsActivos } from "@/data/options";
 import { invalidatePedidos } from "@/lib/invalidations";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface Pedido {
   id: string;
@@ -48,6 +49,7 @@ const ESTADOS_PEDIDO = [
 export default function Pedidos() {
   const { profile } = useAuth();
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [filterEstado, setFilterEstado] = useState("all");
   const [open, setOpen] = useState(false);
@@ -292,7 +294,7 @@ export default function Pedidos() {
               <div className="flex gap-1">
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewOpen(p)}><Eye className="h-3.5 w-3.5" /></Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => { if (confirm("¿Eliminar pedido?")) del.mutate(p.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={async () => { if (await confirm({ title: "¿Eliminar pedido?", description: `Se eliminará el pedido ${p.numero_pedido}. Esta acción no se puede deshacer.`, tone: "destructive", confirmLabel: "Eliminar" })) del.mutate(p.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
           );
