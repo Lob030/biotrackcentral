@@ -8,6 +8,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cajasKeys } from "@/lib/queryKeys";
+import { invalidateCajas } from "@/lib/invalidations";
 import type { CajaRow } from "@/lib/types";
 
 type CajaInsertPayload = Omit<CajaRow, "id" | "created_at" | "updated_at">;
@@ -49,7 +50,7 @@ export function useUpsertCaja(opts?: { onSuccess?: () => void; onError?: (e: unk
       else await createCaja(args.payload);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: cajasKeys.all });
+      invalidateCajas(qc);
       opts?.onSuccess?.();
     },
     onError: opts?.onError,
@@ -61,7 +62,7 @@ export function useDeleteCaja(opts?: { onSuccess?: () => void; onError?: (e: unk
   return useMutation({
     mutationFn: deleteCaja,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: cajasKeys.all });
+      invalidateCajas(qc);
       opts?.onSuccess?.();
     },
     onError: opts?.onError,

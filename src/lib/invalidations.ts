@@ -23,10 +23,12 @@ import { lotesStockKey, lotesProyeccionKey } from "@/data/lotes";
  * Call after create / update / delete / split / event-applied mutations.
  */
 export function invalidateLotes(qc: QueryClient) {
+  // Covers all keys prefixed with ["lotes", ...] (lotesKeys.list / .detail / .options)
   qc.invalidateQueries({ queryKey: ["lotes"] });
-  qc.invalidateQueries({ queryKey: ["lotes-dash"] });
   qc.invalidateQueries({ queryKey: lotesStockKey });
   qc.invalidateQueries({ queryKey: lotesProyeccionKey });
+  // Alertas page reads lotes under its own key — keep it in sync.
+  qc.invalidateQueries({ queryKey: ["lotes-alertas"] });
 }
 
 /**
@@ -38,6 +40,36 @@ export function invalidateLoteEventos(qc: QueryClient) {
   invalidateLotes(qc);
   qc.invalidateQueries({ queryKey: ["lote-eventos"] });
   qc.invalidateQueries({ queryKey: ["lote-detalle"] });
+  // Pedidos page derives stock by etapa from lote totals.
+  qc.invalidateQueries({ queryKey: ["stock-por-etapa"] });
+}
+
+/**
+ * Invalidate every cache that depends on the cajas table.
+ */
+export function invalidateCajas(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["cajas"] });
+  qc.invalidateQueries({ queryKey: ["cajas-alertas"] });
+}
+
+/**
+ * Invalidate every cache that depends on the clientes table.
+ */
+export function invalidateClientes(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["clientes"] });
+  qc.invalidateQueries({ queryKey: ["clientes-alertas"] });
+}
+
+/**
+ * Invalidate every cache that depends on the pedidos table.
+ */
+export function invalidatePedidos(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["pedidos"] });
+  qc.invalidateQueries({ queryKey: ["pedidos-alertas"] });
+  qc.invalidateQueries({ queryKey: ["ventas-pedidos"] });
+  qc.invalidateQueries({ queryKey: ["mejores-clientes-pedidos"] });
+  qc.invalidateQueries({ queryKey: ["mejores-clientes-pedidos-anio"] });
+  qc.invalidateQueries({ queryKey: ["mejores-clientes-ultima"] });
 }
 
 /**
@@ -48,6 +80,7 @@ export function invalidateGastos(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ["gastos-recurrentes"] });
   qc.invalidateQueries({ queryKey: ["gastos-comparativa"] });
   qc.invalidateQueries({ queryKey: ["ventas-gastos"] });
+  qc.invalidateQueries({ queryKey: ["gastos-alertas"] });
 }
 
 /**
@@ -55,6 +88,7 @@ export function invalidateGastos(qc: QueryClient) {
  */
 export function invalidateAlertasPersonalizadas(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ["alertas_personalizadas"] });
+  qc.invalidateQueries({ queryKey: ["alertas_personalizadas_eval"] });
 }
 
 /**
