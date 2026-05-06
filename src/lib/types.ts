@@ -34,7 +34,7 @@ export type ClienteInsert = Tables["clientes"]["Insert"];
 export type PedidoInsert = Tables["pedidos"]["Insert"];
 
 // Common enums
-export type EspecieEnum = Enums["especie"];
+export type EspecieEnum = Enums["especie_type"];
 export type LoteEstadoEnum = Enums["lote_estado"];
 export type LoteTipoEnum = Enums["lote_tipo"];
 export type CajaEstadoEnum = Enums["caja_estado"];
