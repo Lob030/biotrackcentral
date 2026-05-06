@@ -207,10 +207,7 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["gastos-list"] });
-      qc.invalidateQueries({ queryKey: ["gastos-recurrentes"] });
-      qc.invalidateQueries({ queryKey: ["gastos-comparativa"] });
-      qc.invalidateQueries({ queryKey: ["ventas-gastos"] });
+      invalidateGastos(qc);
       toast.success("Gasto eliminado");
     },
     onError: (e: any) => toast.error(friendlyError(e, "Error al eliminar")),
