@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
 const baseItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Líneas Genéticas", url: "/lineas", icon: GitBranch },
   { title: "Cajas", url: "/cajas", icon: Package },
   { title: "Lotes", url: "/lotes", icon: Layers },

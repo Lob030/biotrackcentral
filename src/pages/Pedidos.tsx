@@ -85,7 +85,8 @@ export default function Pedidos() {
   // Stock en vivo: suma cantidad_actual de lotes activos agrupados por especie+etapa (calculada).
   const { data: stockMap = {} } = useQuery({
     queryKey: ["stock-por-etapa"],
-    refetchInterval: 5000,
+    enabled: open,
+    refetchInterval: open ? 20_000 : false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lotes")
