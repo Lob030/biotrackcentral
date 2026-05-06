@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { invalidateGastos } from "@/lib/invalidations";
 import {
   Bar,
   BarChart,
@@ -188,10 +189,7 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["gastos-list"] });
-      qc.invalidateQueries({ queryKey: ["gastos-recurrentes"] });
-      qc.invalidateQueries({ queryKey: ["gastos-comparativa"] });
-      qc.invalidateQueries({ queryKey: ["ventas-gastos"] });
+      invalidateGastos(qc);
       toast.success(form.id ? "Gasto actualizado" : "Gasto registrado");
       setOpen(false);
       setForm(blankForm());
@@ -209,10 +207,7 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["gastos-list"] });
-      qc.invalidateQueries({ queryKey: ["gastos-recurrentes"] });
-      qc.invalidateQueries({ queryKey: ["gastos-comparativa"] });
-      qc.invalidateQueries({ queryKey: ["ventas-gastos"] });
+      invalidateGastos(qc);
       toast.success("Gasto eliminado");
     },
     onError: (e: any) => toast.error(friendlyError(e, "Error al eliminar")),

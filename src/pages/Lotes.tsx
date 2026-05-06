@@ -17,6 +17,7 @@ import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
 import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
 import { useCajaOptions, useLineaGeneticaOptions } from "@/data/options";
 import { useLotesList } from "@/data/lotes";
+import { invalidateLotes } from "@/lib/invalidations";
 
 interface Lote {
   id: string;
@@ -92,8 +93,7 @@ export default function Lotes() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lotes"] });
-      qc.invalidateQueries({ queryKey: ["lotes-dash"] });
+      invalidateLotes(qc);
       setOpen(false); setEditing(null);
       toast.success(editing ? "Lote actualizado" : "Lote creado");
     },
@@ -105,7 +105,7 @@ export default function Lotes() {
       const { error } = await supabase.from("lotes").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lotes"] }); toast.success("Lote eliminado"); },
+    onSuccess: () => { invalidateLotes(qc); toast.success("Lote eliminado"); },
     onError: (e: any) => toast.error(friendlyError(e)),
   });
 
@@ -363,8 +363,7 @@ function DividirLoteModal({ lote, onClose, cajas }: { lote: Lote | null; onClose
       if (e2) throw e2;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lotes"] });
-      qc.invalidateQueries({ queryKey: ["lotes-dash"] });
+      invalidateLotes(qc);
       toast.success("Lote dividido en sub-lotes");
       onClose();
       setMachos(""); setHembras(""); setCajaMachos(""); setCajaHembras("");

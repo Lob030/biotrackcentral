@@ -36,6 +36,7 @@ import { Pencil, Trash2, Plus, Settings2, Sparkles, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { ALERTAS_SISTEMA } from "@/lib/alertasSistema";
 import { ETAPAS } from "@/lib/etapas";
+import { invalidateAlertasPersonalizadas, invalidateAlertasSistema } from "@/lib/invalidations";
 
 interface Props {
   open: boolean;
@@ -178,8 +179,7 @@ export default function AdministrarAlertasModal({ open, onOpenChange }: Props) {
       }
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["alertas_sistema_config"] });
-      qc.invalidateQueries({ queryKey: ["alertas-desactivadas"] });
+      invalidateAlertasSistema(qc);
       toast.success(vars.activa ? "Alerta activada" : "Alerta desactivada");
     },
     onError: (e: any) => toast.error(e.message),
@@ -194,7 +194,7 @@ export default function AdministrarAlertasModal({ open, onOpenChange }: Props) {
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["alertas_personalizadas"] });
+      invalidateAlertasPersonalizadas(qc);
       toast.success(vars.activa ? "Alerta activada" : "Alerta desactivada");
     },
     onError: (e: any) => toast.error(e.message),
@@ -209,7 +209,7 @@ export default function AdministrarAlertasModal({ open, onOpenChange }: Props) {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["alertas_personalizadas"] });
+      invalidateAlertasPersonalizadas(qc);
       toast.success("Alerta eliminada");
     },
     onError: (e: any) => toast.error(e.message),
@@ -292,7 +292,7 @@ export default function AdministrarAlertasModal({ open, onOpenChange }: Props) {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["alertas_personalizadas"] });
+      invalidateAlertasPersonalizadas(qc);
       toast.success(editing?.id ? "Alerta actualizada" : "Alerta creada");
       setFormOpen(false);
       setEditing(null);
