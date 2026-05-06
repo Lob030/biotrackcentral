@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, Users, Save, Shield } from "lucide-react";
+import { Building2, Users, Save, Shield, Image as ImageIcon, Upload, Trash2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { Navigate } from "react-router-dom";
@@ -21,9 +21,11 @@ import { Navigate } from "react-router-dom";
 type AppRole = "admin" | "trabajador";
 
 export default function Admin() {
-  const { profile, role } = useAuth();
+  const { profile, role, organization, refreshOrganization } = useAuth();
   const qc = useQueryClient();
   const [orgNombre, setOrgNombre] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: org } = useQuery({
     queryKey: ["org", profile?.organization_id],
