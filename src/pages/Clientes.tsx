@@ -32,7 +32,6 @@ const ESTADOS = [
 export default function Clientes() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState("all");
   const [filterEstado, setFilterEstado] = useState("activo");
@@ -52,21 +51,30 @@ export default function Clientes() {
     notas: "",
   });
 
-  const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes", filterEstado],
-    queryFn: async () => {
-      let q = supabase.from("clientes").select("*").order("created_at", { ascending: false });
-      if (filterEstado !== "all") q = q.eq("estado_cliente", filterEstado as any);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as Cliente[];
+  const { data: clientes = [] } = useClientesList({ estado: filterEstado });
+
+  const upsert = useUpsertCliente({
+    onSuccess: () => {
+      setOpen(false);
+      setEditing(null);
+      toast.success(editing ? "Cliente actualizado" : "Cliente creado");
     },
+    onError: (e) => toast.error(friendlyError(e)),
   });
 
-  const upsert = useMutation({
-    mutationFn: async () => {
-      if (!profile) throw new Error("Sin perfil");
-      const payload = {
+  const del = useDeleteCliente({
+    onSuccess: () => toast.success("Cliente eliminado"),
+    onError: (e) => toast.error(friendlyError(e)),
+  });
+
+  const submit = () => {
+    if (!profile) {
+      toast.error(friendlyError(new Error("Sin perfil")));
+      return;
+    }
+    upsert.mutate({
+      id: editing?.id,
+      payload: {
         nombre: form.nombre,
         contacto_principal: form.contacto_principal || null,
         email: form.email || null,
@@ -74,39 +82,13 @@ export default function Clientes() {
         direccion: form.direccion || null,
         ciudad: form.ciudad || null,
         rfc: form.rfc || null,
-        tipo_cliente: form.tipo_cliente as any,
-        estado_cliente: form.estado_cliente as any,
+        tipo_cliente: form.tipo_cliente as Cliente["tipo_cliente"],
+        estado_cliente: form.estado_cliente as Cliente["estado_cliente"],
         notas: form.notas || null,
         organization_id: profile.organization_id,
-      };
-      if (editing) {
-        const { error } = await supabase.from("clientes").update(payload).eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("clientes").insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clientes"] });
-      setOpen(false);
-      setEditing(null);
-      toast.success(editing ? "Cliente actualizado" : "Cliente creado");
-    },
-    onError: (e: any) => toast.error(friendlyError(e)),
-  });
-
-  const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("clientes").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clientes"] });
-      toast.success("Cliente eliminado");
-    },
-    onError: (e: any) => toast.error(friendlyError(e)),
-  });
+      } as Omit<Cliente, "id" | "created_at" | "updated_at">,
+    });
+  };
 
   const openNew = () => {
     setEditing(null);
