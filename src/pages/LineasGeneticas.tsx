@@ -24,7 +24,6 @@ type Linea = LineaGeneticaRow;
 
 export default function LineasGeneticas() {
   const { profile } = useAuth();
-  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterEsp, setFilterEsp] = useState<string>("all");
   const [open, setOpen] = useState(false);
@@ -39,59 +38,33 @@ export default function LineasGeneticas() {
     notas: "",
   });
 
-  const { data: lineas = [] } = useQuery({
-    queryKey: ["lineas"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("lineas_geneticas").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as Linea[];
-    },
-  });
+  const { data: lineas = [] } = useLineasList();
+  const { data: lotesCount = {} } = useLineasIndividuosCount();
 
-  const { data: lotesCount = {} } = useQuery({
-    queryKey: ["lineas-count"],
-    queryFn: async () => {
-      const { data } = await supabase.from("lotes").select("linea_genetica_id, cantidad_actual").eq("estado", "activo");
-      const map: Record<string, number> = {};
-      (data ?? []).forEach((l: any) => {
-        if (l.linea_genetica_id) map[l.linea_genetica_id] = (map[l.linea_genetica_id] || 0) + (l.cantidad_actual || 0);
-      });
-      return map;
-    },
-  });
-
-  const upsert = useMutation({
-    mutationFn: async () => {
-      if (!profile) throw new Error("Sin perfil");
-      const payload = { ...form, organization_id: profile.organization_id };
-      if (editing) {
-        const { error } = await supabase.from("lineas_geneticas").update(payload).eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("lineas_geneticas").insert(payload);
-        if (error) throw error;
-      }
-    },
+  const upsert = useUpsertLinea({
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lineas"] });
       setOpen(false);
       setEditing(null);
       toast.success(editing ? "Línea actualizada" : "Línea creada");
     },
-    onError: (e: any) => toast.error(friendlyError(e)),
+    onError: (e) => toast.error(friendlyError(e)),
   });
 
-  const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("lineas_geneticas").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lineas"] });
-      toast.success("Línea eliminada");
-    },
-    onError: (e: any) => toast.error(friendlyError(e)),
+  const del = useDeleteLinea({
+    onSuccess: () => toast.success("Línea eliminada"),
+    onError: (e) => toast.error(friendlyError(e)),
   });
+
+  const submit = () => {
+    if (!profile) {
+      toast.error(friendlyError(new Error("Sin perfil")));
+      return;
+    }
+    upsert.mutate({
+      id: editing?.id,
+      payload: { ...form, organization_id: profile.organization_id },
+    });
+  };
 
   const openNew = () => {
     setEditing(null);
