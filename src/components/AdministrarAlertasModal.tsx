@@ -179,8 +179,7 @@ export default function AdministrarAlertasModal({ open, onOpenChange }: Props) {
       }
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["alertas_sistema_config"] });
-      qc.invalidateQueries({ queryKey: ["alertas-desactivadas"] });
+      invalidateAlertasSistema(qc);
       toast.success(vars.activa ? "Alerta activada" : "Alerta desactivada");
     },
     onError: (e: any) => toast.error(e.message),
