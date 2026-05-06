@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,20 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { useClientesList, useUpsertCliente, useDeleteCliente } from "@/data/clientes";
+import type { ClienteRow } from "@/lib/types";
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  contacto_principal: string | null;
-  email: string | null;
-  telefono: string | null;
-  direccion: string | null;
-  ciudad: string | null;
-  rfc: string | null;
-  tipo_cliente: string;
-  estado_cliente: string;
-  notas: string | null;
-}
+type Cliente = ClienteRow;
 
 const TIPOS_CLIENTE = [
   { value: "general", label: "General" },
