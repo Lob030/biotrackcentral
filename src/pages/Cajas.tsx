@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Plus, MapPin, Pencil, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useCajasList, useUpsertCaja, useDeleteCaja } from "@/data/cajas";
 import type { CajaRow } from "@/lib/types";
+import { CardGridSkeleton } from "@/components/ui/list-skeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type Caja = CajaRow;
 
@@ -37,7 +40,8 @@ export default function Cajas() {
     notas: "",
   });
 
-  const { data: cajas = [] } = useCajasList();
+  const cajasQuery = useCajasList();
+  const cajas = cajasQuery.data ?? [];
 
   const upsert = useUpsertCaja({
     onSuccess: () => {
@@ -87,18 +91,25 @@ export default function Cajas() {
     setOpen(true);
   };
 
-  const filtered = cajas.filter((c) => {
-    if (filterUso !== "all" && c.uso !== filterUso) return false;
-    if (filterEstado !== "all" && c.estado !== filterEstado) return false;
-    return true;
-  });
+  const filtered = useMemo(
+    () =>
+      cajas.filter((c) => {
+        if (filterUso !== "all" && c.uso !== filterUso) return false;
+        if (filterEstado !== "all" && c.estado !== filterEstado) return false;
+        return true;
+      }),
+    [cajas, filterUso, filterEstado],
+  );
 
-  const stats = {
-    reproductoras: cajas.filter((c) => c.uso === "reproductor").length,
-    engorda: cajas.filter((c) => c.uso === "engorda").length,
-    ocupadas: cajas.filter((c) => c.estado === "ocupada").length,
-    libres: cajas.filter((c) => c.estado === "libre").length,
-  };
+  const stats = useMemo(
+    () => ({
+      reproductoras: cajas.filter((c) => c.uso === "reproductor").length,
+      engorda: cajas.filter((c) => c.uso === "engorda").length,
+      ocupadas: cajas.filter((c) => c.estado === "ocupada").length,
+      libres: cajas.filter((c) => c.estado === "libre").length,
+    }),
+    [cajas],
+  );
 
   return (
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto animate-fade-in">
