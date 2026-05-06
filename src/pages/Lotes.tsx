@@ -363,8 +363,7 @@ function DividirLoteModal({ lote, onClose, cajas }: { lote: Lote | null; onClose
       if (e2) throw e2;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lotes"] });
-      qc.invalidateQueries({ queryKey: ["lotes-dash"] });
+      invalidateLotes(qc);
       toast.success("Lote dividido en sub-lotes");
       onClose();
       setMachos(""); setHembras(""); setCajaMachos(""); setCajaHembras("");
