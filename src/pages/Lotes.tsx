@@ -15,6 +15,7 @@ import { friendlyError } from "@/lib/errors";
 import { Link } from "react-router-dom";
 import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
 import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
+import { useCajaOptions, useLineaGeneticaOptions } from "@/data/options";
 
 interface Lote {
   id: string;
@@ -69,15 +70,8 @@ export default function Lotes() {
     },
   });
 
-  const { data: lineas = [] } = useQuery({
-    queryKey: ["lineas-options"],
-    queryFn: async () => (await supabase.from("lineas_geneticas").select("id, nombre, especie")).data ?? [],
-  });
-
-  const { data: cajas = [] } = useQuery({
-    queryKey: ["cajas-options"],
-    queryFn: async () => (await supabase.from("cajas").select("id, codigo, uso")).data ?? [],
-  });
+  const { data: lineas = [] } = useLineaGeneticaOptions();
+  const { data: cajas = [] } = useCajaOptions();
 
   const upsert = useMutation({
     mutationFn: async () => {

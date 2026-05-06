@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { useCajaOptions } from "@/data/options";
 
 export type EventoTipo = "mortalidad" | "venta" | "traslado_caja" | "ajuste" | "nota";
 
@@ -75,10 +76,8 @@ export default function EventoDialog({ lote, tipo, open, onClose }: EventoDialog
     }
   }, [open, today]);
 
-  const { data: cajas = [] } = useQuery({
-    queryKey: ["cajas-options"],
-    queryFn: async () =>
-      (await supabase.from("cajas").select("id, codigo, uso, estado")).data ?? [],
+  const { data: cajas = [] } = useCajaOptions({
+    includeEstado: true,
     enabled: open && tipo === "traslado_caja",
   });
 

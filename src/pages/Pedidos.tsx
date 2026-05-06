@@ -12,6 +12,7 @@ import { Plus, Search, Pencil, Trash2, Trash, Eye, AlertCircle } from "lucide-re
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } from "@/lib/etapas";
+import { useClienteOptionsActivos } from "@/data/options";
 
 interface Pedido {
   id: string;
@@ -76,10 +77,7 @@ export default function Pedidos() {
     },
   });
 
-  const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes-options"],
-    queryFn: async () => (await supabase.from("clientes").select("id, nombre").eq("estado_cliente", "activo")).data ?? [],
-  });
+  const { data: clientes = [] } = useClienteOptionsActivos();
 
   // Stock en vivo: suma cantidad_actual de lotes activos agrupados por especie+etapa (calculada).
   const { data: stockMap = {} } = useQuery({
