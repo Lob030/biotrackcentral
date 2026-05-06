@@ -3,7 +3,7 @@
  *
  * Mutations remain inline in pages this round to avoid touching business logic.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { lotesKeys } from "@/lib/queryKeys";
 import type { LoteRow } from "@/lib/types";
@@ -32,6 +32,8 @@ export function useLotesList(filters?: { estado?: string }) {
   return useQuery({
     queryKey: lotesKeys.list({ estado: filters?.estado ?? "all" }),
     queryFn: () => fetchLotesList(filters),
+    // Keep previous rows visible while a new filter loads -> no blank flash.
+    placeholderData: keepPreviousData,
   });
 }
 
