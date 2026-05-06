@@ -15,6 +15,7 @@ import type { CajaRow } from "@/lib/types";
 import { CardGridSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type Caja = CajaRow;
 
@@ -26,6 +27,7 @@ const ESTADO_COLORS = {
 
 export default function Cajas() {
   const { profile } = useAuth();
+  const confirm = useConfirm();
   const [filterUso, setFilterUso] = useState("all");
   const [filterEstado, setFilterEstado] = useState("all");
   const [open, setOpen] = useState(false);
@@ -180,7 +182,7 @@ export default function Cajas() {
               <p className="text-sm text-muted-foreground">Capacidad: {c.capacidad ?? "—"}</p>
               <div className="border-t border-border/60 mt-4 pt-3 flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition">
                 <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5 mr-1" /> Editar</Button>
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { if (confirm("¿Eliminar caja?")) del.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar</Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => { if (await confirm({ title: "¿Eliminar caja?", description: `Se eliminará la caja "${c.codigo}". Esta acción no se puede deshacer.`, tone: "destructive", confirmLabel: "Eliminar" })) del.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar</Button>
               </div>
             </div>
           ))}
