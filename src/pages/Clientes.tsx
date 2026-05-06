@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,20 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { useClientesList, useUpsertCliente, useDeleteCliente } from "@/data/clientes";
+import type { ClienteRow } from "@/lib/types";
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  contacto_principal: string | null;
-  email: string | null;
-  telefono: string | null;
-  direccion: string | null;
-  ciudad: string | null;
-  rfc: string | null;
-  tipo_cliente: string;
-  estado_cliente: string;
-  notas: string | null;
-}
+type Cliente = ClienteRow;
 
 const TIPOS_CLIENTE = [
   { value: "general", label: "General" },
@@ -44,7 +32,6 @@ const ESTADOS = [
 export default function Clientes() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState("all");
   const [filterEstado, setFilterEstado] = useState("activo");
@@ -64,21 +51,30 @@ export default function Clientes() {
     notas: "",
   });
 
-  const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes", filterEstado],
-    queryFn: async () => {
-      let q = supabase.from("clientes").select("*").order("created_at", { ascending: false });
-      if (filterEstado !== "all") q = q.eq("estado_cliente", filterEstado as any);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as Cliente[];
+  const { data: clientes = [] } = useClientesList({ estado: filterEstado });
+
+  const upsert = useUpsertCliente({
+    onSuccess: () => {
+      setOpen(false);
+      setEditing(null);
+      toast.success(editing ? "Cliente actualizado" : "Cliente creado");
     },
+    onError: (e) => toast.error(friendlyError(e)),
   });
 
-  const upsert = useMutation({
-    mutationFn: async () => {
-      if (!profile) throw new Error("Sin perfil");
-      const payload = {
+  const del = useDeleteCliente({
+    onSuccess: () => toast.success("Cliente eliminado"),
+    onError: (e) => toast.error(friendlyError(e)),
+  });
+
+  const submit = () => {
+    if (!profile) {
+      toast.error(friendlyError(new Error("Sin perfil")));
+      return;
+    }
+    upsert.mutate({
+      id: editing?.id,
+      payload: {
         nombre: form.nombre,
         contacto_principal: form.contacto_principal || null,
         email: form.email || null,
@@ -86,39 +82,13 @@ export default function Clientes() {
         direccion: form.direccion || null,
         ciudad: form.ciudad || null,
         rfc: form.rfc || null,
-        tipo_cliente: form.tipo_cliente as any,
-        estado_cliente: form.estado_cliente as any,
+        tipo_cliente: form.tipo_cliente as Cliente["tipo_cliente"],
+        estado_cliente: form.estado_cliente as Cliente["estado_cliente"],
         notas: form.notas || null,
         organization_id: profile.organization_id,
-      };
-      if (editing) {
-        const { error } = await supabase.from("clientes").update(payload).eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("clientes").insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clientes"] });
-      setOpen(false);
-      setEditing(null);
-      toast.success(editing ? "Cliente actualizado" : "Cliente creado");
-    },
-    onError: (e: any) => toast.error(friendlyError(e)),
-  });
-
-  const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("clientes").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clientes"] });
-      toast.success("Cliente eliminado");
-    },
-    onError: (e: any) => toast.error(friendlyError(e)),
-  });
+      } as Omit<Cliente, "id" | "created_at" | "updated_at">,
+    });
+  };
 
   const openNew = () => {
     setEditing(null);
@@ -275,7 +245,7 @@ export default function Clientes() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => upsert.mutate()} disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
+            <Button onClick={submit} disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
               {editing ? "Guardar" : "Crear cliente"}
             </Button>
           </DialogFooter>
