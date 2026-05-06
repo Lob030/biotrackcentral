@@ -221,7 +221,7 @@ export default function Cajas() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => upsert.mutate()} disabled={!form.codigo || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear caja"}</Button>
+            <Button onClick={submit} disabled={!form.codigo || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear caja"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
