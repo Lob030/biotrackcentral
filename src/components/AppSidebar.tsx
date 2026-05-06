@@ -67,15 +67,21 @@ export function AppSidebar() {
       <SidebarContent className="px-2 py-4">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu className="gap-1" aria-label="Navegación principal">
               {items.map((item) => {
                 const active = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className="h-11">
+                    <SidebarMenuButton
+                      asChild
+                      className="h-11"
+                      tooltip={item.title}
+                      isActive={active}
+                    >
                       <NavLink
                         to={item.url}
                         end
+                        aria-current={active ? "page" : undefined}
                         className={
                           active
                             ? "!bg-sidebar-accent !text-primary font-medium relative"
@@ -85,7 +91,10 @@ export function AppSidebar() {
                         <item.icon className="h-[18px] w-[18px]" />
                         <span>{item.title}</span>
                         {active && (
-                          <span className="absolute right-2 h-1.5 w-1.5 rounded-full bg-primary shadow-glow" />
+                          <span
+                            className="absolute right-2 h-1.5 w-1.5 rounded-full bg-primary shadow-glow group-data-[collapsible=icon]:hidden"
+                            aria-hidden
+                          />
                         )}
                       </NavLink>
                     </SidebarMenuButton>

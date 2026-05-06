@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { invalidateGastos } from "@/lib/invalidations";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Bar,
   BarChart,
@@ -94,6 +95,7 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
   const { profile } = useAuth();
   const orgId = profile?.organization_id;
   const qc = useQueryClient();
+  const confirm = useConfirm();
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(blankForm());
@@ -306,8 +308,14 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
     setOpen(true);
   };
 
-  const onDelete = (id: string) => {
-    if (!window.confirm("¿Eliminar este gasto? Esta acción no se puede deshacer.")) return;
+  const onDelete = async (id: string) => {
+    const ok = await confirm({
+      title: "¿Eliminar este gasto?",
+      description: "Esta acción no se puede deshacer.",
+      tone: "destructive",
+      confirmLabel: "Eliminar",
+    });
+    if (!ok) return;
     deleteMut.mutate(id);
   };
 

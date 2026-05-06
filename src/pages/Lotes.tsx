@@ -22,6 +22,7 @@ import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Layers as LayersIcon } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface Lote {
   id: string;
@@ -48,6 +49,7 @@ interface Lote {
 export default function Lotes() {
   const { profile } = useAuth();
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [filterTipo, setFilterTipo] = useState("all");
   const [filterEsp, setFilterEsp] = useState("all");
   const [filterEstado, setFilterEstado] = useState("activo");
@@ -247,7 +249,7 @@ export default function Lotes() {
                       <Link to={`/lotes/${l.id}`}><Eye className="h-3.5 w-3.5" /></Link>
                     </Button>
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => { if (confirm("¿Eliminar lote?")) del.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={async () => { if (await confirm({ title: "¿Eliminar lote?", description: `Se eliminará el lote "${l.codigo ?? l.id.slice(0, 8)}" y sus eventos asociados. Esta acción no se puede deshacer.`, tone: "destructive", confirmLabel: "Eliminar" })) del.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>
               </div>

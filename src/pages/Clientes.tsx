@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { useClientesList, useUpsertCliente, useDeleteCliente } from "@/data/clientes";
 import type { ClienteRow } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type Cliente = ClienteRow;
 
@@ -32,6 +33,7 @@ const ESTADOS = [
 export default function Clientes() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState("all");
   const [filterEstado, setFilterEstado] = useState("activo");
@@ -182,7 +184,7 @@ export default function Clientes() {
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
                   <Button size="icon" variant="ghost" className="h-7 w-7" title="Ver perfil" onClick={() => navigate(`/clientes/${c.id}`)}><Eye className="h-3.5 w-3.5" /></Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => { if (confirm("¿Eliminar cliente?")) del.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={async () => { if (await confirm({ title: "¿Eliminar cliente?", description: `Se eliminará "${c.nombre}". Esta acción no se puede deshacer.`, tone: "destructive", confirmLabel: "Eliminar" })) del.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
 

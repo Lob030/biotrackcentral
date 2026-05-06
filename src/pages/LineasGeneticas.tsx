@@ -17,6 +17,7 @@ import {
   useDeleteLinea,
 } from "@/data/lineasGeneticas";
 import type { LineaGeneticaRow } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const COLORS = ["#06b6d4", "#10b981", "#a855f7", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899", "#f97316", "#14b8a6", "#8b5cf6"];
 
@@ -24,6 +25,7 @@ type Linea = LineaGeneticaRow;
 
 export default function LineasGeneticas() {
   const { profile } = useAuth();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [filterEsp, setFilterEsp] = useState<string>("all");
   const [open, setOpen] = useState(false);
@@ -130,7 +132,7 @@ export default function LineasGeneticas() {
                   <h3 className="display-font text-lg font-bold truncate">{l.nombre}</h3>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => { if (confirm("¿Eliminar línea?")) del.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={async () => { if (await confirm({ title: "¿Eliminar línea genética?", description: `Se eliminará "${l.nombre}". Esta acción no se puede deshacer.`, tone: "destructive", confirmLabel: "Eliminar" })) del.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>
                 <Badge variant="outline" className="mt-1 text-[10px]">{l.especie}</Badge>
