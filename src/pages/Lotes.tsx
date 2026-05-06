@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,10 @@ import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
 import { useCajaOptions, useLineaGeneticaOptions } from "@/data/options";
 import { useLotesList } from "@/data/lotes";
 import { invalidateLotes } from "@/lib/invalidations";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Layers as LayersIcon } from "lucide-react";
 
 interface Lote {
   id: string;
@@ -61,7 +65,11 @@ export default function Lotes() {
     cantidad_inicial: "", cantidad_actual: "", machos: "", hembras: "", notas: "",
   });
 
-  const { data: lotes = [] } = useLotesList({ estado: filterEstado }) as { data: Lote[] };
+  const lotesQuery = useLotesList({ estado: filterEstado }) as ReturnType<typeof useLotesList> & { data: Lote[] };
+  const lotes = (lotesQuery.data ?? []) as Lote[];
+  const isLoading = lotesQuery.isLoading;
+  const isFetching = lotesQuery.isFetching;
+  const lotesError = lotesQuery.error;
 
   const { data: lineas = [] } = useLineaGeneticaOptions();
   const { data: cajas = [] } = useCajaOptions();
@@ -127,11 +135,15 @@ export default function Lotes() {
     setOpen(true);
   };
 
-  const filtered = lotes.filter((l) => {
-    if (filterTipo !== "all" && l.tipo !== filterTipo) return false;
-    if (filterEsp !== "all" && l.especie !== filterEsp) return false;
-    return true;
-  });
+  const filtered = useMemo(
+    () =>
+      lotes.filter((l) => {
+        if (filterTipo !== "all" && l.tipo !== filterTipo) return false;
+        if (filterEsp !== "all" && l.especie !== filterEsp) return false;
+        return true;
+      }),
+    [lotes, filterTipo, filterEsp],
+  );
 
   return (
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto animate-fade-in">
