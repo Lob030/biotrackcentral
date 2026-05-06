@@ -19,6 +19,7 @@ interface OrganizationInfo {
   plan_expira_en: string | null;
   plan_gratis_trial: boolean;
   nombre_bioterio: string | null;
+  logo_url: string | null;
 }
 
 interface AuthContextValue {
