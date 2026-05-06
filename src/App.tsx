@@ -11,6 +11,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import PageLoader from "@/components/PageLoader";
 import RoleRoute from "@/components/RoleRoute";
 import PublicRoute from "./components/PublicRoute";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 
 // Eager — small + on the critical path
 import Auth from "./pages/Auth";
@@ -63,6 +64,7 @@ const App = () => (
       <ErrorBoundary>
         <BrowserRouter>
           <AuthProvider>
+            <ConfirmDialogProvider>
             <Routes>
               <Route
                 path="/"
@@ -98,6 +100,7 @@ const App = () => (
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </ConfirmDialogProvider>
           </AuthProvider>
         </BrowserRouter>
       </ErrorBoundary>
