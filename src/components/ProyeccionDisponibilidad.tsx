@@ -124,7 +124,7 @@ export default function ProyeccionDisponibilidad() {
     hour: "2-digit", minute: "2-digit",
   });
 
-  const handleRefresh = () => qc.invalidateQueries({ queryKey: ["lotes-proyeccion"] });
+  const handleRefresh = () => qc.invalidateQueries({ queryKey: lotesProyeccionKey });
 
   return (
     <section className="mt-10">
