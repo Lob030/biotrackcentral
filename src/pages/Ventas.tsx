@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import GastosTab from "@/components/GastosTab";
 import MejoresClientesTab from "@/components/MejoresClientesTab";
+import { EmptyState as SharedEmptyState } from "@/components/ui/empty-state";
 import {
   BarChart2,
   DollarSign,
@@ -283,23 +284,31 @@ export default function Ventas() {
 
   return (
     <div className="p-6 md:p-8 max-w-[1400px] mx-auto animate-fade-in space-y-6">
-      <div className="flex items-start justify-between flex-wrap gap-4">
+      <div className="page-header">
         <div>
-          <h1 className="display-font text-4xl font-bold tracking-tight flex items-center gap-3">
+          <h1 className="page-title flex items-center gap-3">
             <BarChart2 className="h-8 w-8 text-primary" /> Ventas & Analytics
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Métricas del negocio · {periodoLabel}
-          </p>
+          <p className="page-subtitle">Métricas del negocio · {periodoLabel}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div
+          className="flex gap-1.5 flex-wrap rounded-lg border border-border/60 bg-card/40 p-1"
+          role="tablist"
+          aria-label="Periodo"
+        >
           {PERIODOS.map((p) => (
             <Button
               key={p.value}
               size="sm"
-              variant={periodo === p.value ? "default" : "outline"}
+              variant={periodo === p.value ? "default" : "ghost"}
               onClick={() => setPeriodo(p.value)}
-              className={periodo === p.value ? "bg-gradient-primary text-primary-foreground shadow-glow" : ""}
+              role="tab"
+              aria-selected={periodo === p.value}
+              className={
+                periodo === p.value
+                  ? "bg-gradient-primary text-primary-foreground shadow-glow h-8"
+                  : "h-8 text-muted-foreground hover:text-foreground"
+              }
             >
               {p.label}
             </Button>
