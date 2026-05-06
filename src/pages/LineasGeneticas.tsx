@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,18 +10,17 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import {
+  useLineasList,
+  useLineasIndividuosCount,
+  useUpsertLinea,
+  useDeleteLinea,
+} from "@/data/lineasGeneticas";
+import type { LineaGeneticaRow } from "@/lib/types";
 
 const COLORS = ["#06b6d4", "#10b981", "#a855f7", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899", "#f97316", "#14b8a6", "#8b5cf6"];
 
-interface Linea {
-  id: string;
-  nombre: string;
-  especie: "ASF" | "Raton" | "Rata";
-  origen: string | null;
-  fecha_registro: string | null;
-  color_etiqueta: string | null;
-  notas: string | null;
-}
+type Linea = LineaGeneticaRow;
 
 export default function LineasGeneticas() {
   const { profile } = useAuth();
