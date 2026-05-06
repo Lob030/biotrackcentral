@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import GastosTab from "@/components/GastosTab";
 import MejoresClientesTab from "@/components/MejoresClientesTab";
-import { EmptyState as SharedEmptyState } from "@/components/ui/empty-state";
 import {
   BarChart2,
   DollarSign,
