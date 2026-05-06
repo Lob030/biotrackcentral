@@ -47,7 +47,7 @@ export default function Stock() {
   const totalGlobal = lotes.reduce((s: number, l: any) => s + (l.cantidad_actual || 0), 0);
 
   const handleRefresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["lotes-stock"] });
+    await queryClient.invalidateQueries({ queryKey: lotesStockKey });
     setUpdatedAt(new Date());
   };
 
