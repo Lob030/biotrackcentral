@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut, BellRing, Boxes, Shield, Users, ShoppingCart, BarChart2 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
