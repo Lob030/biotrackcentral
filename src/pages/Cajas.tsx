@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,16 +10,10 @@ import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
+import { useCajasList, useUpsertCaja, useDeleteCaja } from "@/data/cajas";
+import type { CajaRow } from "@/lib/types";
 
-interface Caja {
-  id: string;
-  codigo: string;
-  ubicacion: string | null;
-  capacidad: number | null;
-  uso: "reproductor" | "engorda";
-  estado: "libre" | "ocupada" | "limpieza";
-  notas: string | null;
-}
+type Caja = CajaRow;
 
 const ESTADO_COLORS = {
   libre: "bg-success/15 text-success border-success/30",
