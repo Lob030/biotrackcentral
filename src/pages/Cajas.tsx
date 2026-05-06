@@ -23,7 +23,6 @@ const ESTADO_COLORS = {
 
 export default function Cajas() {
   const { profile } = useAuth();
-  const qc = useQueryClient();
   const [filterUso, setFilterUso] = useState("all");
   const [filterEstado, setFilterEstado] = useState("all");
   const [open, setOpen] = useState(false);
@@ -38,19 +37,30 @@ export default function Cajas() {
     notas: "",
   });
 
-  const { data: cajas = [] } = useQuery({
-    queryKey: ["cajas"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("cajas").select("*").order("codigo");
-      if (error) throw error;
-      return data as Caja[];
+  const { data: cajas = [] } = useCajasList();
+
+  const upsert = useUpsertCaja({
+    onSuccess: () => {
+      setOpen(false);
+      setEditing(null);
+      toast.success(editing ? "Caja actualizada" : "Caja creada");
     },
+    onError: (e) => toast.error(friendlyError(e)),
   });
 
-  const upsert = useMutation({
-    mutationFn: async () => {
-      if (!profile) throw new Error("Sin perfil");
-      const payload = {
+  const del = useDeleteCaja({
+    onSuccess: () => toast.success("Caja eliminada"),
+    onError: (e) => toast.error(friendlyError(e)),
+  });
+
+  const submit = () => {
+    if (!profile) {
+      toast.error(friendlyError(new Error("Sin perfil")));
+      return;
+    }
+    upsert.mutate({
+      id: editing?.id,
+      payload: {
         codigo: form.codigo,
         ubicacion: form.ubicacion || null,
         capacidad: form.capacidad ? parseInt(form.capacidad) : null,
@@ -58,32 +68,9 @@ export default function Cajas() {
         estado: form.estado,
         notas: form.notas || null,
         organization_id: profile.organization_id,
-      };
-      if (editing) {
-        const { error } = await supabase.from("cajas").update(payload).eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("cajas").insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cajas"] });
-      setOpen(false);
-      setEditing(null);
-      toast.success(editing ? "Caja actualizada" : "Caja creada");
-    },
-    onError: (e: any) => toast.error(friendlyError(e)),
-  });
-
-  const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("cajas").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cajas"] }); toast.success("Caja eliminada"); },
-    onError: (e: any) => toast.error(friendlyError(e)),
-  });
+      },
+    });
+  };
 
   const openNew = () => {
     setEditing(null);
