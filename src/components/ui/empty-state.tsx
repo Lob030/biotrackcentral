@@ -23,17 +23,20 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "glass-card p-10 text-center flex flex-col items-center gap-3",
+        "glass-card px-6 py-12 text-center flex flex-col items-center gap-4 animate-fade-in-up",
         className,
       )}
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground">
-        <Icon className="h-6 w-6" />
+      <div className="relative">
+        <div className="absolute inset-0 -m-2 rounded-2xl bg-primary/5 blur-xl" aria-hidden />
+        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-border/60 bg-muted/40 text-muted-foreground">
+          <Icon className="h-6 w-6" strokeWidth={1.75} />
+        </div>
       </div>
-      <div>
-        <p className="font-semibold text-foreground">{title}</p>
+      <div className="max-w-md">
+        <p className="display-font text-base font-semibold text-foreground">{title}</p>
         {description && (
-          <p className="text-sm text-muted-foreground mt-1 max-w-md">
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
             {description}
           </p>
         )}

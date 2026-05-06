@@ -1,4 +1,3 @@
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface ListSkeletonProps {
@@ -9,6 +8,7 @@ interface ListSkeletonProps {
 
 /**
  * Lightweight skeleton list for loading states on cards/rows.
+ * Uses shimmer overlay for a more premium feel.
  */
 export function ListSkeleton({
   rows = 4,
@@ -21,15 +21,15 @@ export function ListSkeleton({
         <div
           key={i}
           className={cn(
-            "glass-card p-5 flex items-center gap-4 animate-pulse",
+            "glass-card p-5 flex items-center gap-4",
             rowClassName,
           )}
         >
           <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-3 w-1/2" />
+            <div className="skeleton-shimmer h-4 w-1/3" />
+            <div className="skeleton-shimmer h-3 w-1/2" />
           </div>
-          <Skeleton className="h-8 w-20" />
+          <div className="skeleton-shimmer h-8 w-20" />
         </div>
       ))}
     </div>
@@ -41,9 +41,6 @@ interface CardGridSkeletonProps {
   className?: string;
 }
 
-/**
- * Square card skeleton grid (Cajas, stat tiles, etc.).
- */
 export function CardGridSkeleton({ count = 6, className }: CardGridSkeletonProps) {
   return (
     <div
@@ -53,11 +50,11 @@ export function CardGridSkeleton({ count = 6, className }: CardGridSkeletonProps
       )}
     >
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="glass-card p-5 space-y-3 animate-pulse">
-          <Skeleton className="h-5 w-1/2" />
-          <Skeleton className="h-3 w-2/3" />
-          <Skeleton className="h-3 w-1/3" />
-          <Skeleton className="h-8 w-full mt-3" />
+        <div key={i} className="glass-card p-5 space-y-3">
+          <div className="skeleton-shimmer h-5 w-1/2" />
+          <div className="skeleton-shimmer h-3 w-2/3" />
+          <div className="skeleton-shimmer h-3 w-1/3" />
+          <div className="skeleton-shimmer h-8 w-full mt-3" />
         </div>
       ))}
     </div>
@@ -72,11 +69,11 @@ export function StatGridSkeleton({ count = 4 }: StatGridSkeletonProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="stat-card animate-pulse space-y-3">
-          <Skeleton className="h-11 w-11 rounded-xl" />
-          <Skeleton className="h-3 w-2/3" />
-          <Skeleton className="h-8 w-1/2" />
-          <Skeleton className="h-3 w-3/4" />
+        <div key={i} className="stat-card space-y-3">
+          <div className="skeleton-shimmer h-11 w-11 rounded-xl" />
+          <div className="skeleton-shimmer h-3 w-2/3" />
+          <div className="skeleton-shimmer h-8 w-1/2" />
+          <div className="skeleton-shimmer h-3 w-3/4" />
         </div>
       ))}
     </div>
