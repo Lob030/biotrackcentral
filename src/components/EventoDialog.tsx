@@ -113,11 +113,7 @@ export default function EventoDialog({ lote, tipo, open, onClose }: EventoDialog
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lotes"] });
-      qc.invalidateQueries({ queryKey: ["lotes-dash"] });
-      qc.invalidateQueries({ queryKey: ["lotes-stock"] });
-      qc.invalidateQueries({ queryKey: ["lote-eventos"] });
-      qc.invalidateQueries({ queryKey: ["lote-detalle"] });
+      invalidateLoteEventos(qc);
       toast.success("Evento registrado");
       onClose();
     },
