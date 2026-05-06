@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { generarAlertas, type AlertaSeveridad } from "@/lib/alertas";
+import { generarAlertas, type AlertaSeveridad, type Alerta } from "@/lib/alertas";
+import {
+  evaluarAlertasPersonalizadas,
+  marcarRecordatoriosGenerados,
+} from "@/lib/alertasPersonalizadas";
 import { AlertTriangle, AlertCircle, Info, BellRing, ArrowRight, CheckCircle2, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -62,8 +66,69 @@ export default function Alertas() {
     },
   });
 
+  const { data: customs = [] } = useQuery({
+    queryKey: ["alertas_personalizadas_eval"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("alertas_personalizadas")
+        .select("*")
+        .eq("activa", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: clientes = [] } = useQuery({
+    queryKey: ["clientes-alertas"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("clientes").select("id, nombre");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: pedidos = [] } = useQuery({
+    queryKey: ["pedidos-alertas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("id, cliente_id, fecha_pedido");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: gastos = [] } = useQuery({
+    queryKey: ["gastos-alertas"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("gastos").select("monto, fecha");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const desactivadas = new Set(desactivadasArr);
-  const alertas = generarAlertas(lotes, cajas, desactivadas);
+  const alertasSistema = generarAlertas(lotes, cajas, desactivadas);
+  const alertasCustom: Alerta[] = evaluarAlertasPersonalizadas(customs as any[], {
+    lotes: lotes as any[],
+    cajas: cajas as any[],
+    clientes: clientes as any[],
+    pedidos: pedidos as any[],
+    gastos: gastos as any[],
+  });
+
+  // Marcar recordatorios disparados (una sola vez por carga)
+  useEffect(() => {
+    if (customs.length === 0 || alertasCustom.length === 0) return;
+    marcarRecordatoriosGenerados(supabase, customs as any[], alertasCustom).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customs.length]);
+
+  const peso = { critical: 0, warning: 1, info: 2 } as const;
+  const alertas = [...alertasSistema, ...alertasCustom].sort(
+    (a, b) => peso[a.severidad] - peso[b.severidad],
+  );
+
   const criticas = alertas.filter((a) => a.severidad === "critical").length;
   const warnings = alertas.filter((a) => a.severidad === "warning").length;
   const infos = alertas.filter((a) => a.severidad === "info").length;
