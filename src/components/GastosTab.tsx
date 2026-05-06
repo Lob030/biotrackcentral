@@ -189,10 +189,7 @@ export default function GastosTab({ periodo }: { periodo: Periodo }) {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["gastos-list"] });
-      qc.invalidateQueries({ queryKey: ["gastos-recurrentes"] });
-      qc.invalidateQueries({ queryKey: ["gastos-comparativa"] });
-      qc.invalidateQueries({ queryKey: ["ventas-gastos"] });
+      invalidateGastos(qc);
       toast.success(form.id ? "Gasto actualizado" : "Gasto registrado");
       setOpen(false);
       setForm(blankForm());
