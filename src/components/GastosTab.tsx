@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { invalidateGastos } from "@/lib/invalidations";
 import {
   Bar,
   BarChart,
