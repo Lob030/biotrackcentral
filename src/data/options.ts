@@ -15,6 +15,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cajasKeys, lineasKeys, clientesKeys } from "@/lib/queryKeys";
 
+// Options/lookup lists rarely change during a session — keep them fresh
+// for 5 minutes so opening dialogs feels instant and doesn't refetch on
+// every mount.
+const OPTIONS_STALE_TIME = 5 * 60 * 1000;
+
 export interface CajaOption {
   id: string;
   codigo: string;
@@ -62,6 +67,7 @@ export function useCajaOptions(opts?: { includeEstado?: boolean; enabled?: boole
     queryKey: [...cajasKeys.options(), { includeEstado: !!opts?.includeEstado }],
     queryFn: () => fetchCajaOptions({ includeEstado: opts?.includeEstado }),
     enabled: opts?.enabled,
+    staleTime: OPTIONS_STALE_TIME,
   });
 }
 
@@ -70,6 +76,7 @@ export function useLineaGeneticaOptions(opts?: { enabled?: boolean }) {
     queryKey: lineasKeys.options(),
     queryFn: fetchLineaGeneticaOptions,
     enabled: opts?.enabled,
+    staleTime: OPTIONS_STALE_TIME,
   });
 }
 
@@ -78,5 +85,6 @@ export function useClienteOptionsActivos(opts?: { enabled?: boolean }) {
     queryKey: [...clientesKeys.all, "options", "activos"] as const,
     queryFn: fetchClienteOptionsActivos,
     enabled: opts?.enabled,
+    staleTime: OPTIONS_STALE_TIME,
   });
 }

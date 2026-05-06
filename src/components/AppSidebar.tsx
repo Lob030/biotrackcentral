@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { LayoutDashboard, GitBranch, Package, Layers, FlaskConical, LogOut, BellRing, Boxes, Shield, Users, ShoppingCart, BarChart2 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -31,12 +32,15 @@ export function AppSidebar() {
   const location = useLocation();
   const logoUrl = organization?.logo_url ?? null;
   const bioterioName = organization?.nombre_bioterio || organization?.nombre || "Bioterio";
-  let items = role === "admin" || isSuperAdmin
-    ? [...baseItems, { title: "Administración", url: "/admin", icon: Shield }]
-    : baseItems;
-  if (isSuperAdmin) {
-    items = [...items, { title: "Panel Maestro", url: "/master", icon: Shield }];
-  }
+  const items = useMemo(() => {
+    let list = role === "admin" || isSuperAdmin
+      ? [...baseItems, { title: "Administración", url: "/admin", icon: Shield }]
+      : baseItems;
+    if (isSuperAdmin) {
+      list = [...list, { title: "Panel Maestro", url: "/master", icon: Shield }];
+    }
+    return list;
+  }, [role, isSuperAdmin]);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">

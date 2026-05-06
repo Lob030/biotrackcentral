@@ -5,6 +5,8 @@ import { Boxes, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ProyeccionDisponibilidad from "@/components/ProyeccionDisponibilidad";
 import { useLotesStock, lotesStockKey } from "@/data/lotes";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 
 const ESPECIES: Especie[] = ["ASF", "Raton", "Rata"];
 
@@ -18,8 +20,7 @@ export default function Stock() {
   const queryClient = useQueryClient();
   const [updatedAt, setUpdatedAt] = useState<Date>(new Date());
 
-  const { data: lotes = [], isFetching } = useLotesStock();
-
+  const { data: lotes = [], isFetching, isLoading, error, refetch } = useLotesStock();
 
   const stockPorEspecie = useMemo(() => {
     const result: Record<Especie, { etapa: string; total: number; lotes: number }[]> = {
@@ -88,8 +89,30 @@ export default function Stock() {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-6">
+          <ErrorState error={error} onRetry={() => refetch()} />
+        </div>
+      )}
+
       {/* Tarjetas por especie */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {ESPECIES.map((esp) => (
+            <div key={esp} className="glass-card p-5 space-y-3 animate-pulse">
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-3 w-32" />
+              <div className="space-y-2 mt-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+      <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 transition-opacity ${isFetching ? "opacity-80" : ""}`}>
         {ESPECIES.map((especie) => {
           const etapas = ETAPAS[especie];
           const filas = stockPorEspecie[especie];
@@ -204,6 +227,7 @@ export default function Stock() {
           );
         })}
       </div>
+      )}
 
       {/* Proyección de disponibilidad por tamaño */}
       <ProyeccionDisponibilidad />

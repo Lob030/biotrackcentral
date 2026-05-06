@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,10 @@ import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
 import { useCajaOptions, useLineaGeneticaOptions } from "@/data/options";
 import { useLotesList } from "@/data/lotes";
 import { invalidateLotes } from "@/lib/invalidations";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Layers as LayersIcon } from "lucide-react";
 
 interface Lote {
   id: string;
@@ -61,7 +65,11 @@ export default function Lotes() {
     cantidad_inicial: "", cantidad_actual: "", machos: "", hembras: "", notas: "",
   });
 
-  const { data: lotes = [] } = useLotesList({ estado: filterEstado }) as { data: Lote[] };
+  const lotesQuery = useLotesList({ estado: filterEstado }) as ReturnType<typeof useLotesList> & { data: Lote[] };
+  const lotes = (lotesQuery.data ?? []) as Lote[];
+  const isLoading = lotesQuery.isLoading;
+  const isFetching = lotesQuery.isFetching;
+  const lotesError = lotesQuery.error;
 
   const { data: lineas = [] } = useLineaGeneticaOptions();
   const { data: cajas = [] } = useCajaOptions();
@@ -127,11 +135,15 @@ export default function Lotes() {
     setOpen(true);
   };
 
-  const filtered = lotes.filter((l) => {
-    if (filterTipo !== "all" && l.tipo !== filterTipo) return false;
-    if (filterEsp !== "all" && l.especie !== filterEsp) return false;
-    return true;
-  });
+  const filtered = useMemo(
+    () =>
+      lotes.filter((l) => {
+        if (filterTipo !== "all" && l.tipo !== filterTipo) return false;
+        if (filterEsp !== "all" && l.especie !== filterEsp) return false;
+        return true;
+      }),
+    [lotes, filterTipo, filterEsp],
+  );
 
   return (
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto animate-fade-in">
@@ -175,69 +187,86 @@ export default function Lotes() {
         </Select>
       </div>
 
-      <div className="space-y-3">
-        {filtered.map((l) => {
-          const dias = diasDesde(l.fecha_nacimiento);
-          const etapa = etapaActual(l.especie, l.fecha_nacimiento);
-          return (
-            <div key={l.id} className="glass-card p-5 flex items-center gap-4 flex-wrap group hover:border-primary/40 transition">
-              <div className="flex-1 min-w-[200px]">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <Link to={`/lotes/${l.id}`} className="display-font text-lg font-bold hover:text-primary transition-colors">
-                    {l.codigo || l.id.slice(0, 8)}
-                  </Link>
-                  {l.lote_padre_id && <Badge variant="outline" className="text-[10px] gap-1"><GitFork className="h-3 w-3" /> sub-lote</Badge>}
-                  <Badge variant="outline" className="capitalize text-[10px]">{l.tipo}</Badge>
-                  <Badge variant="outline" className="text-[10px]">{l.especie}</Badge>
-                  <Badge className="text-[10px] capitalize" variant={l.estado === "activo" ? "default" : "secondary"}>{l.estado}</Badge>
-                </div>
-                {l.sexo && <p className="text-xs text-muted-foreground capitalize">{l.sexo === "machos" ? "♂ Machos" : l.sexo === "hembras" ? "♀ Hembras" : "Mixto"}</p>}
-              </div>
-
-              <div className="min-w-[150px]">
-                <p className="text-[10px] uppercase text-muted-foreground tracking-wider">Línea genética</p>
-                <p className="text-sm font-medium">{l.lineas_geneticas?.nombre ?? "Sin línea"}</p>
-                <p className="text-xs text-muted-foreground">Caja: {l.cajas?.codigo ?? "—"}</p>
-              </div>
-
-              <div className="min-w-[150px]">
-                <p className="text-[10px] uppercase text-muted-foreground tracking-wider">Etapa actual</p>
-                <p className="text-sm font-medium">{etapa}</p>
-                <p className="text-xs text-muted-foreground">{dias} días · {l.cantidad_actual} ind.</p>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                {l.estado === "activo" && (
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" title="Mortalidad" onClick={() => { setEventoLote(l); setEventoTipo("mortalidad"); }}>
-                      <Skull className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-success/80 hover:text-success hover:bg-success/10" title="Venta" onClick={() => { setEventoLote(l); setEventoTipo("venta"); }}>
-                      <DollarSign className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-primary/80 hover:text-primary hover:bg-primary/10" title="Trasladar" onClick={() => { setEventoLote(l); setEventoTipo("traslado_caja"); }}>
-                      <ArrowRightLeft className="h-3.5 w-3.5" />
-                    </Button>
+      {lotesError ? (
+        <ErrorState error={lotesError} onRetry={() => lotesQuery.refetch()} />
+      ) : isLoading ? (
+        <ListSkeleton rows={5} />
+      ) : (
+        <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-70" : ""}`}>
+          {filtered.map((l) => {
+            const dias = diasDesde(l.fecha_nacimiento);
+            const etapa = etapaActual(l.especie, l.fecha_nacimiento);
+            return (
+              <div key={l.id} className="glass-card p-5 flex items-center gap-4 flex-wrap group hover:border-primary/40 transition">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <Link to={`/lotes/${l.id}`} className="display-font text-lg font-bold hover:text-primary transition-colors">
+                      {l.codigo || l.id.slice(0, 8)}
+                    </Link>
+                    {l.lote_padre_id && <Badge variant="outline" className="text-[10px] gap-1"><GitFork className="h-3 w-3" /> sub-lote</Badge>}
+                    <Badge variant="outline" className="capitalize text-[10px]">{l.tipo}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{l.especie}</Badge>
+                    <Badge className="text-[10px] capitalize" variant={l.estado === "activo" ? "default" : "secondary"}>{l.estado}</Badge>
                   </div>
-                )}
-                {l.tipo === "nacimiento" && l.estado === "activo" && (
-                  <Button size="sm" variant="outline" onClick={() => setSplitOpen(l)} className="border-primary/40 text-primary hover:bg-primary/10">
-                    <Scissors className="h-3.5 w-3.5 mr-1" /> Dividir
-                  </Button>
-                )}
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver detalle" asChild>
-                    <Link to={`/lotes/${l.id}`}><Eye className="h-3.5 w-3.5" /></Link>
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => { if (confirm("¿Eliminar lote?")) del.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  {l.sexo && <p className="text-xs text-muted-foreground capitalize">{l.sexo === "machos" ? "♂ Machos" : l.sexo === "hembras" ? "♀ Hembras" : "Mixto"}</p>}
+                </div>
+
+                <div className="min-w-[150px]">
+                  <p className="text-[10px] uppercase text-muted-foreground tracking-wider">Línea genética</p>
+                  <p className="text-sm font-medium">{l.lineas_geneticas?.nombre ?? "Sin línea"}</p>
+                  <p className="text-xs text-muted-foreground">Caja: {l.cajas?.codigo ?? "—"}</p>
+                </div>
+
+                <div className="min-w-[150px]">
+                  <p className="text-[10px] uppercase text-muted-foreground tracking-wider">Etapa actual</p>
+                  <p className="text-sm font-medium">{etapa}</p>
+                  <p className="text-xs text-muted-foreground">{dias} días · {l.cantidad_actual} ind.</p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  {l.estado === "activo" && (
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" title="Mortalidad" onClick={() => { setEventoLote(l); setEventoTipo("mortalidad"); }}>
+                        <Skull className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-success/80 hover:text-success hover:bg-success/10" title="Venta" onClick={() => { setEventoLote(l); setEventoTipo("venta"); }}>
+                        <DollarSign className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary/80 hover:text-primary hover:bg-primary/10" title="Trasladar" onClick={() => { setEventoLote(l); setEventoTipo("traslado_caja"); }}>
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                  {l.tipo === "nacimiento" && l.estado === "activo" && (
+                    <Button size="sm" variant="outline" onClick={() => setSplitOpen(l)} className="border-primary/40 text-primary hover:bg-primary/10">
+                      <Scissors className="h-3.5 w-3.5 mr-1" /> Dividir
+                    </Button>
+                  )}
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver detalle" asChild>
+                      <Link to={`/lotes/${l.id}`}><Eye className="h-3.5 w-3.5" /></Link>
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => { if (confirm("¿Eliminar lote?")) del.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-        {filtered.length === 0 && <div className="glass-card p-12 text-center text-muted-foreground">No hay lotes. <button onClick={openNew} className="text-primary hover:underline">Crear el primero</button></div>}
-      </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <EmptyState
+              icon={LayersIcon}
+              title="No hay lotes"
+              description="No se encontraron lotes con los filtros seleccionados."
+              action={
+                <Button onClick={openNew} variant="outline">
+                  <Plus className="h-4 w-4 mr-1" /> Crear el primero
+                </Button>
+              }
+            />
+          )}
+        </div>
+      )}
 
       <EventoDialog lote={eventoLote} tipo={eventoTipo} open={!!eventoLote} onClose={() => setEventoLote(null)} />
 
