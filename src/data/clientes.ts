@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { clientesKeys } from "@/lib/queryKeys";
+import { invalidateClientes } from "@/lib/invalidations";
 import type { ClienteRow } from "@/lib/types";
 
 type ClienteInsertPayload = Omit<ClienteRow, "id" | "created_at" | "updated_at">;
@@ -49,7 +50,7 @@ export function useUpsertCliente(opts?: { onSuccess?: () => void; onError?: (e: 
       else await createCliente(args.payload);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: clientesKeys.all });
+      invalidateClientes(qc);
       opts?.onSuccess?.();
     },
     onError: opts?.onError,
@@ -61,7 +62,7 @@ export function useDeleteCliente(opts?: { onSuccess?: () => void; onError?: (e: 
   return useMutation({
     mutationFn: deleteCliente,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: clientesKeys.all });
+      invalidateClientes(qc);
       opts?.onSuccess?.();
     },
     onError: opts?.onError,
