@@ -27,8 +27,10 @@ const baseItems = [
 ];
 
 export function AppSidebar() {
-  const { profile, role, signOut, isSuperAdmin } = useAuth();
+  const { profile, role, signOut, isSuperAdmin, organization } = useAuth();
   const location = useLocation();
+  const logoUrl = organization?.logo_url ?? null;
+  const bioterioName = organization?.nombre_bioterio || organization?.nombre || "Bioterio";
   let items = role === "admin" || isSuperAdmin
     ? [...baseItems, { title: "Administración", url: "/admin", icon: Shield }]
     : baseItems;
@@ -40,11 +42,19 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
-            <FlaskConical className="h-5 w-5 text-primary-foreground" strokeWidth={2.5} />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-primary shadow-glow overflow-hidden">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={bioterioName}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <FlaskConical className="h-5 w-5 text-primary-foreground" strokeWidth={2.5} />
+            )}
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="display-font text-base font-bold text-sidebar-foreground">Bioterio</span>
+            <span className="display-font text-base font-bold text-sidebar-foreground truncate max-w-[160px]">{bioterioName}</span>
             <span className="text-xs text-muted-foreground">Sistema de Gestión</span>
           </div>
         </div>

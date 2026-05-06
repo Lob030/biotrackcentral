@@ -1,100 +1,47 @@
-## Mejoras: Clientes, Pedidos y precios por etapa
+## Objetivo
 
-Voy a integrar el módulo que enviaste, **adaptado** a la arquitectura actual del proyecto (Lovable Cloud, multi-org con `organization_id` ligado a `organizations`, RLS por `get_user_org`, mismo estilo glass-card y `display-font`). No copio los archivos tal cual: corrijo cosas que romperían el sistema.
+Permitir a los administradores de cada organización subir un logo personalizado de su bioterio, que se muestre en el sidebar (reemplazando el ícono `FlaskConical` por defecto).
 
----
+## Cambios propuestos
 
-### 1. Base de datos (migración nueva)
+### 1. Backend (migración SQL)
 
-Tres tablas nuevas con el mismo patrón de RLS que el resto del proyecto:
+- **Agregar columna** `logo_url TEXT` a `public.organizations` (nullable).
+- **Crear bucket público** `org-logos` en Storage.
+- **Políticas RLS** sobre `storage.objects` para el bucket `org-logos`:
+  - SELECT público (cualquiera puede ver logos).
+  - INSERT/UPDATE/DELETE solo por `admin` o `super_admin` de la organización dueña, validando que el `name` del archivo empiece con el `organization_id` del usuario (carpeta = org id).
 
-**`clientes`**
-- `id`, `organization_id` (referencia a `organizations.id`, **no** a `auth.users` como traía el SQL subido — eso era un bug)
-- `nombre`, `contacto_principal`, `email`, `telefono`
-- `direccion`, `ciudad`, `estado`, `codigo_postal`, `pais` (default `'Mexico'`)
-- `rfc`, `tipo_cliente` (general / laboratorio / centro_investigacion / veterinario)
-- `estado_cliente` (activo / inactivo / bloqueado)
-- `notas`, `created_at`, `updated_at`
-- Único: `(organization_id, nombre)`
+Estructura de archivos: `org-logos/{organization_id}/logo.{ext}`.
 
-**`pedidos`**
-- `id`, `organization_id`, `cliente_id` (FK con `ON DELETE CASCADE`)
-- `numero_pedido`, `fecha_pedido`, `fecha_entrega_solicitada`, `fecha_entrega_realizada`
-- `subtotal`, `porcentaje_descuento`, `monto_descuento`, `total` (numeric 10,2)
-- `estado` (pendiente / confirmado / en_preparacion / listo / entregado / cancelado)
-- `notas`, timestamps
-- Único: `(organization_id, numero_pedido)`
+### 2. Hook `useAuth`
 
-**`pedidos_detalles`**
-- `id`, `pedido_id` (FK CASCADE)
-- `especie`, `etapa`, `cantidad`, `precio_unitario`
-- `subtotal` columna **generada** `(cantidad * precio_unitario) STORED`
-- timestamps
+- Añadir `logo_url` al tipo `OrganizationInfo` y a los dos `select` de `organizations`.
 
-**RLS** en las 3 tablas: políticas SELECT/INSERT/UPDATE/DELETE por `organization_id = get_user_org(auth.uid())` (igual que `lotes`, `cajas`, etc.). Para `pedidos_detalles` el filtro va por subquery al pedido padre.
+### 3. Sidebar (`AppSidebar.tsx`)
 
-**Trigger** `touch_updated_at` reutilizado (ya existe en BD) en lugar de crear 3 funciones nuevas como traía el SQL del zip.
+- Si `organization.logo_url` existe, mostrar `<img>` (objeto cubriendo el cuadro 40x40 redondeado) en lugar de `FlaskConical`.
+- Mantener el ícono por defecto cuando no haya logo.
 
-Índices en `organization_id`, `cliente_id`, `estado`, `fecha_pedido`, `pedido_id`.
+### 4. Página de Administración (`Admin.tsx`)
 
----
+- Nueva sección "Identidad del bioterio" con:
+  - Vista previa del logo actual (o placeholder).
+  - Input file (acepta `image/png, image/jpeg, image/webp, image/svg+xml`, máx ~2MB).
+  - Botón "Subir logo": sube a `org-logos/{org_id}/logo.{ext}` (con `upsert: true`), obtiene URL pública y guarda en `organizations.logo_url`.
+  - Botón "Quitar logo": elimina el archivo del bucket y pone `logo_url = null`.
+  - Tras cambios, llamar `refreshOrganization()` para refrescar el sidebar al instante.
 
-### 2. `src/lib/etapas.ts` — añadir precios y descuentos
+Solo visible para `admin` (la página ya está restringida).
 
-Extiendo el archivo actual **sin perder** lo que ya tiene:
-- Añadir campo `precio: number` a cada etapa (con los valores que mandaste).
-- Añadir helpers nuevos: `obtenerPrecio(especie, etapa)`, `calcularDescuento(subtotal)`, `calcularTotales(subtotal)`.
+### 5. UX
 
-Tabla de descuentos por volumen (la que ya viene en tu archivo):
-- ≥ $10,000 → 20%
-- ≥ $5,000 → 15%
-- ≥ $2,500 → 10%
-- ≥ $600 → 5%
+- Validación de tamaño y tipo de archivo en cliente antes de subir.
+- Toasts de éxito/error con `friendlyError`.
+- Estado de carga en el botón mientras se sube.
 
-Esto NO toca `etapaActual`, `rangoDias`, `rangoPeso`, ni `ETAPAS` ya existentes — solo se añade la propiedad `precio` a cada entrada y las funciones nuevas.
+## Notas técnicas
 
----
-
-### 3. Páginas nuevas
-
-**`src/pages/Clientes.tsx`** — CRUD adaptado al estilo del proyecto:
-- Header `display-font text-4xl`, botón `bg-gradient-primary shadow-glow`.
-- Filtros: búsqueda + tipo + estado.
-- Grid de tarjetas `glass-card` con badges de tipo/estado, contacto, email, teléfono, ciudad.
-- Diálogo crear/editar con todos los campos.
-
-**`src/pages/Pedidos.tsx`** — Pedidos con líneas de detalle y descuentos automáticos:
-- Listado de pedidos con número, cliente, fecha, subtotal, descuento (si aplica) y total.
-- Diálogo crear/editar:
-  - Encabezado: número, cliente (select), fecha, estado, notas.
-  - Sección "Productos": elegir especie → etapa (carga `precio` automáticamente desde `ETAPAS`) → cantidad → agregar línea.
-  - Resumen en tiempo real con subtotal, descuento aplicado y total (usando `calcularTotales`).
-- Diálogo de vista (solo lectura) con resumen.
-- Auto-precio: al añadir una línea, el precio se toma de `obtenerPrecio()` (no se pide al usuario, se puede sobreescribir solo si lo necesitas — confirma si quieres permitirlo).
-
-Ambas páginas usan `useAuth().profile.organization_id` para el insert.
-
----
-
-### 4. Navegación
-
-**`src/App.tsx`**: añadir rutas `/clientes` y `/pedidos` dentro del bloque protegido.
-
-**`src/components/AppSidebar.tsx`**: añadir 2 entradas a `baseItems` con iconos `Users` (Clientes) y `ShoppingCart` (Pedidos), entre Lotes y Stock.
-
----
-
-### Detalles técnicos / correcciones al material subido
-
-- El SQL del zip referenciaba `auth.users(id)` para `organization_id` — **incorrecto** en este proyecto (rompería RLS multi-org). Usaré `organizations(id)`.
-- El zip definía 3 funciones `update_timestamp_*` — uso la `touch_updated_at` que ya existe.
-- El SQL del zip **no incluía RLS** — añado políticas `Org select/insert/update/delete` en las 3 tablas.
-- El componente `Pedidos.tsx` usa `Especie` importado de `@/lib/etapas`, lo cual ya queda compatible al ampliar ese archivo.
-- Los tipos generados de Supabase (`src/integrations/supabase/types.ts`) se regeneran solos tras la migración.
-
-### Fuera de alcance (preguntar después)
-- Descontar stock automáticamente al marcar un pedido como `entregado` (requiere lógica de qué lote consumir).
-- Generar PDF/factura del pedido.
-- Reportes de ventas por cliente o por etapa.
-
-¿Procedo con todo o quieres ajustar algo (por ejemplo, permitir editar el precio unitario manualmente al crear una línea)?
+- Bucket público para que `<img src=...>` funcione sin firmar URLs.
+- Se usa `cache-busting` añadiendo `?v={timestamp}` a la URL guardada para evitar caché tras reemplazo.
+- No se modifica `LandingPage` ni `Auth` (logo es interno por ahora; si más adelante se quiere mostrar en login, basta con consultar la org por subdominio o similar).

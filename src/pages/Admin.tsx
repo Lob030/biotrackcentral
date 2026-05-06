@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, Users, Save, Shield } from "lucide-react";
+import { Building2, Users, Save, Shield, Image as ImageIcon, Upload, Trash2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { Navigate } from "react-router-dom";
@@ -21,9 +21,11 @@ import { Navigate } from "react-router-dom";
 type AppRole = "admin" | "trabajador";
 
 export default function Admin() {
-  const { profile, role } = useAuth();
+  const { profile, role, organization, refreshOrganization } = useAuth();
   const qc = useQueryClient();
   const [orgNombre, setOrgNombre] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: org } = useQuery({
     queryKey: ["org", profile?.organization_id],
@@ -95,6 +97,67 @@ export default function Admin() {
     onError: (e: any) => toast.error(friendlyError(e)),
   });
 
+  const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Formato no soportado. Usa PNG, JPG, WEBP o SVG.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("El archivo es demasiado grande (máx 2MB).");
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${profile!.organization_id}/logo.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("org-logos")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("org-logos").getPublicUrl(path);
+      const url = `${pub.publicUrl}?v=${Date.now()}`;
+      const { error: dbErr } = await supabase
+        .from("organizations")
+        .update({ logo_url: url })
+        .eq("id", profile!.organization_id);
+      if (dbErr) throw dbErr;
+      await refreshOrganization();
+      qc.invalidateQueries({ queryKey: ["org"] });
+      toast.success("Logo actualizado");
+    } catch (err: any) {
+      toast.error(friendlyError(err));
+    } finally {
+      setUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    setUploadingLogo(true);
+    try {
+      // Try to remove known extensions; ignore errors
+      const exts = ["png", "jpg", "jpeg", "webp", "svg"];
+      await supabase.storage
+        .from("org-logos")
+        .remove(exts.map((e) => `${profile!.organization_id}/logo.${e}`));
+      const { error } = await supabase
+        .from("organizations")
+        .update({ logo_url: null })
+        .eq("id", profile!.organization_id);
+      if (error) throw error;
+      await refreshOrganization();
+      qc.invalidateQueries({ queryKey: ["org"] });
+      toast.success("Logo eliminado");
+    } catch (err: any) {
+      toast.error(friendlyError(err));
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   if (role !== "admin") return <Navigate to="/dashboard" replace />;
 
   return (
@@ -126,6 +189,58 @@ export default function Admin() {
           >
             <Save className="h-4 w-4 mr-1" /> Guardar
           </Button>
+        </div>
+      </section>
+
+      {/* Logo del bioterio */}
+      <section className="glass-card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <ImageIcon className="h-5 w-5 text-primary" />
+          <h2 className="display-font text-lg font-semibold">Logo del bioterio</h2>
+        </div>
+        <div className="flex items-center gap-5 flex-wrap">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-gradient-primary shadow-glow overflow-hidden border border-border/40">
+            {organization?.logo_url ? (
+              <img
+                src={organization.logo_url}
+                alt="Logo del bioterio"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <FlaskConical className="h-8 w-8 text-primary-foreground" strokeWidth={2.5} />
+            )}
+          </div>
+          <div className="flex-1 min-w-[240px] space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Sube una imagen cuadrada (PNG, JPG, WEBP o SVG, máx 2MB). Se mostrará en el menú lateral.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                className="hidden"
+                onChange={handleLogoFile}
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingLogo}
+                className="bg-gradient-primary text-primary-foreground hover:opacity-90"
+              >
+                <Upload className="h-4 w-4 mr-1" />
+                {uploadingLogo ? "Subiendo..." : organization?.logo_url ? "Reemplazar logo" : "Subir logo"}
+              </Button>
+              {organization?.logo_url && (
+                <Button
+                  variant="outline"
+                  onClick={handleRemoveLogo}
+                  disabled={uploadingLogo}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Quitar
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
