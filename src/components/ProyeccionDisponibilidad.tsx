@@ -58,20 +58,10 @@ export default function ProyeccionDisponibilidad() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Especie>("Raton");
 
-  const { data: lotes = [], isFetching, dataUpdatedAt } = useQuery({
-    queryKey: ["lotes-proyeccion"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lotes")
-        .select("id,codigo,especie,fecha_nacimiento,cantidad_actual,estado")
-        .eq("estado", "activo")
-        .not("fecha_nacimiento", "is", null)
-        .order("fecha_nacimiento", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as LoteRow[];
-    },
+  const { data: lotes = [], isFetching, dataUpdatedAt } = useLotesProyeccion({
     refetchInterval: 5 * 60 * 1000,
   });
+
 
   const proyPorEspecie = useMemo(() => {
     const result: Record<Especie, FilaProy[]> = { ASF: [], Raton: [], Rata: [] };
