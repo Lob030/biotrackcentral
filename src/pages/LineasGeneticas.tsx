@@ -199,7 +199,7 @@ export default function LineasGeneticas() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => upsert.mutate()} disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear línea"}</Button>
+            <Button onClick={submit} disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear línea"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
