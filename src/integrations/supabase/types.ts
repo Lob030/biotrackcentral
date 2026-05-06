@@ -472,6 +472,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          logo_url: string | null
           nombre: string
           nombre_bioterio: string | null
           plan: string
@@ -481,6 +482,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          logo_url?: string | null
           nombre: string
           nombre_bioterio?: string | null
           plan?: string
@@ -490,6 +492,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          logo_url?: string | null
           nombre?: string
           nombre_bioterio?: string | null
           plan?: string
