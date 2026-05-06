@@ -93,8 +93,7 @@ export default function Lotes() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lotes"] });
-      qc.invalidateQueries({ queryKey: ["lotes-dash"] });
+      invalidateLotes(qc);
       setOpen(false); setEditing(null);
       toast.success(editing ? "Lote actualizado" : "Lote creado");
     },
