@@ -147,10 +147,10 @@ export default function Lotes() {
 
   return (
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+      <div className="page-header mb-6">
         <div>
-          <h1 className="display-font text-4xl font-bold tracking-tight">Lotes</h1>
-          <p className="text-muted-foreground mt-1">{filtered.length} lotes</p>
+          <h1 className="page-title">Lotes</h1>
+          <p className="page-subtitle tabular-nums">{filtered.length} {filtered.length === 1 ? "lote" : "lotes"}</p>
         </div>
         <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
           <Plus className="h-4 w-4 mr-1" /> Nuevo lote

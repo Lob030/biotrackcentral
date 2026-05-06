@@ -86,14 +86,14 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
+      <div className="page-header">
         <div>
-          <h1 className="display-font text-4xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Resumen operativo del bioterio · {profile?.nombre}</p>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">Resumen operativo del bioterio · {profile?.nombre}</p>
         </div>
-        <div className="glass-card px-4 py-2 flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4 text-primary" />
-          {today}
+        <div className="glass-card px-3.5 py-2 flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+          <Calendar className="h-3.5 w-3.5 text-primary" />
+          <span className="capitalize">{today}</span>
         </div>
       </div>
 
@@ -147,19 +147,19 @@ export default function Dashboard() {
                     const dias = diasDesde(l.fecha_nacimiento);
                     const etapa = etapaActual(l.especie as Especie, l.fecha_nacimiento);
                     return (
-                      <div key={l.id} className="py-3 flex items-center justify-between gap-4">
+                      <div key={l.id} className="py-3 flex items-center justify-between gap-4 -mx-2 px-2 rounded-md transition-colors hover:bg-muted/30">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold">{l.codigo || l.id.slice(0, 8)}</span>
+                            <span className="font-semibold text-sm">{l.codigo || l.id.slice(0, 8)}</span>
                             <Badge variant="outline" className="capitalize text-[10px]">{l.tipo}</Badge>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
                             {l.especie} · {l.lineas_geneticas?.nombre ?? "Sin línea"} · Caja: {l.cajas?.codigo ?? "—"}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-medium">{etapa}</p>
-                          <p className="text-xs text-muted-foreground">{dias} días · {l.cantidad_actual} ind.</p>
+                          <p className="text-xs text-muted-foreground tabular-nums">{dias} días · {l.cantidad_actual} ind.</p>
                         </div>
                       </div>
                     );
