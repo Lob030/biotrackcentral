@@ -5,6 +5,8 @@ import { Boxes, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ProyeccionDisponibilidad from "@/components/ProyeccionDisponibilidad";
 import { useLotesStock, lotesStockKey } from "@/data/lotes";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 
 const ESPECIES: Especie[] = ["ASF", "Raton", "Rata"];
 
@@ -18,8 +20,7 @@ export default function Stock() {
   const queryClient = useQueryClient();
   const [updatedAt, setUpdatedAt] = useState<Date>(new Date());
 
-  const { data: lotes = [], isFetching } = useLotesStock();
-
+  const { data: lotes = [], isFetching, isLoading, error, refetch } = useLotesStock();
 
   const stockPorEspecie = useMemo(() => {
     const result: Record<Especie, { etapa: string; total: number; lotes: number }[]> = {
