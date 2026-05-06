@@ -1,24 +1,18 @@
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { ETAPAS, diasDesde, diasParaEtapa, type Especie } from "@/lib/etapas";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CalendarDays, RefreshCw, Zap } from "lucide-react";
+import { useLotesProyeccion, lotesProyeccionKey, type LoteProyeccionRow } from "@/data/lotes";
 
 const ESPECIES: Especie[] = ["ASF", "Raton", "Rata"];
 const ESPECIE_LABEL: Record<Especie, string> = { ASF: "ASF", Raton: "Ratón", Rata: "Rata" };
 
-type LoteRow = {
-  id: string;
-  codigo: string | null;
-  especie: Especie;
-  fecha_nacimiento: string | null;
-  cantidad_actual: number | null;
-  estado: string;
-};
+type LoteRow = LoteProyeccionRow;
+
 
 type FilaProy = {
   etapa: string;
@@ -64,20 +58,10 @@ export default function ProyeccionDisponibilidad() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Especie>("Raton");
 
-  const { data: lotes = [], isFetching, dataUpdatedAt } = useQuery({
-    queryKey: ["lotes-proyeccion"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lotes")
-        .select("id,codigo,especie,fecha_nacimiento,cantidad_actual,estado")
-        .eq("estado", "activo")
-        .not("fecha_nacimiento", "is", null)
-        .order("fecha_nacimiento", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as LoteRow[];
-    },
+  const { data: lotes = [], isFetching, dataUpdatedAt } = useLotesProyeccion({
     refetchInterval: 5 * 60 * 1000,
   });
+
 
   const proyPorEspecie = useMemo(() => {
     const result: Record<Especie, FilaProy[]> = { ASF: [], Raton: [], Rata: [] };
@@ -140,7 +124,7 @@ export default function ProyeccionDisponibilidad() {
     hour: "2-digit", minute: "2-digit",
   });
 
-  const handleRefresh = () => qc.invalidateQueries({ queryKey: ["lotes-proyeccion"] });
+  const handleRefresh = () => qc.invalidateQueries({ queryKey: lotesProyeccionKey });
 
   return (
     <section className="mt-10">

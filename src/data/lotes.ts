@@ -34,3 +34,63 @@ export function useLotesList(filters?: { estado?: string }) {
     queryFn: () => fetchLotesList(filters),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Stock view: active lotes restricted to nacimiento/engorda. Used by Stock page.
+// Keeps the legacy ["lotes-stock"] key so external invalidations (EventoDialog)
+// keep working without changes.
+// ---------------------------------------------------------------------------
+export type LoteStockRow = LoteRow;
+
+export async function fetchLotesStock(): Promise<LoteStockRow[]> {
+  const { data, error } = await supabase
+    .from("lotes")
+    .select("*")
+    .eq("estado", "activo")
+    .in("tipo", ["nacimiento", "engorda"]);
+  if (error) throw error;
+  return (data ?? []) as LoteStockRow[];
+}
+
+export const lotesStockKey = ["lotes-stock"] as const;
+
+export function useLotesStock() {
+  return useQuery({
+    queryKey: lotesStockKey,
+    queryFn: fetchLotesStock,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Proyección view: active lotes with fecha_nacimiento, ordered ascending.
+// Keeps the legacy ["lotes-proyeccion"] key.
+// ---------------------------------------------------------------------------
+export type LoteProyeccionRow = {
+  id: string;
+  codigo: string | null;
+  especie: LoteRow["especie"];
+  fecha_nacimiento: string | null;
+  cantidad_actual: number | null;
+  estado: string;
+};
+
+export async function fetchLotesProyeccion(): Promise<LoteProyeccionRow[]> {
+  const { data, error } = await supabase
+    .from("lotes")
+    .select("id,codigo,especie,fecha_nacimiento,cantidad_actual,estado")
+    .eq("estado", "activo")
+    .not("fecha_nacimiento", "is", null)
+    .order("fecha_nacimiento", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as LoteProyeccionRow[];
+}
+
+export const lotesProyeccionKey = ["lotes-proyeccion"] as const;
+
+export function useLotesProyeccion(opts?: { refetchInterval?: number }) {
+  return useQuery({
+    queryKey: lotesProyeccionKey,
+    queryFn: fetchLotesProyeccion,
+    refetchInterval: opts?.refetchInterval,
+  });
+}

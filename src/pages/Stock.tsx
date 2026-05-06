@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { ETAPAS, etapaActual, rangoDias, rangoPeso, type Especie } from "@/lib/etapas";
 import { Boxes, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ProyeccionDisponibilidad from "@/components/ProyeccionDisponibilidad";
+import { useLotesStock, lotesStockKey } from "@/data/lotes";
 
 const ESPECIES: Especie[] = ["ASF", "Raton", "Rata"];
 
@@ -18,18 +18,8 @@ export default function Stock() {
   const queryClient = useQueryClient();
   const [updatedAt, setUpdatedAt] = useState<Date>(new Date());
 
-  const { data: lotes = [], isFetching } = useQuery({
-    queryKey: ["lotes-stock"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lotes")
-        .select("*")
-        .eq("estado", "activo")
-        .in("tipo", ["nacimiento", "engorda"]);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { data: lotes = [], isFetching } = useLotesStock();
+
 
   const stockPorEspecie = useMemo(() => {
     const result: Record<Especie, { etapa: string; total: number; lotes: number }[]> = {
@@ -57,7 +47,7 @@ export default function Stock() {
   const totalGlobal = lotes.reduce((s: number, l: any) => s + (l.cantidad_actual || 0), 0);
 
   const handleRefresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["lotes-stock"] });
+    await queryClient.invalidateQueries({ queryKey: lotesStockKey });
     setUpdatedAt(new Date());
   };
 
