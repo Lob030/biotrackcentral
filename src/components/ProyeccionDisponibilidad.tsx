@@ -1,24 +1,18 @@
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { ETAPAS, diasDesde, diasParaEtapa, type Especie } from "@/lib/etapas";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CalendarDays, RefreshCw, Zap } from "lucide-react";
+import { useLotesProyeccion, lotesProyeccionKey, type LoteProyeccionRow } from "@/data/lotes";
 
 const ESPECIES: Especie[] = ["ASF", "Raton", "Rata"];
 const ESPECIE_LABEL: Record<Especie, string> = { ASF: "ASF", Raton: "Ratón", Rata: "Rata" };
 
-type LoteRow = {
-  id: string;
-  codigo: string | null;
-  especie: Especie;
-  fecha_nacimiento: string | null;
-  cantidad_actual: number | null;
-  estado: string;
-};
+type LoteRow = LoteProyeccionRow;
+
 
 type FilaProy = {
   etapa: string;
