@@ -135,6 +135,81 @@ export function validateIntent(raw: unknown) {
   return { intent: env.intent, confidence: env.confidence, payload };
 }
 
+// ───────────── Multi-operation (batch) schemas ─────────────
+
+export const operationEnvelopeSchema = z.object({
+  id: z.string().trim().min(1).max(40),
+  intent: z.enum(INTENT_NAMES),
+  confidence: z.number().min(0).max(1).default(0.5),
+  payload: z.record(z.unknown()),
+  source_text: z.string().max(800).optional(),
+});
+
+export const batchEnvelopeSchema = z.object({
+  operations: z.array(operationEnvelopeSchema).min(1).max(20),
+});
+
+export interface ValidOperation {
+  id: string;
+  intent: IntentName;
+  confidence: number;
+  payload: Record<string, unknown>;
+  source_text?: string;
+  requires_confirmation: true;
+}
+export interface InvalidOperation {
+  id: string;
+  intent?: string;
+  error: string;
+  raw: unknown;
+  source_text?: string;
+}
+
+export function validateOperation(raw: unknown):
+  | { ok: true; op: ValidOperation }
+  | { ok: false; bad: InvalidOperation } {
+  const envParsed = operationEnvelopeSchema.safeParse(raw);
+  if (!envParsed.success) {
+    const r = raw as any;
+    return {
+      ok: false,
+      bad: {
+        id: r?.id ?? "tmp-?",
+        intent: r?.intent,
+        error: envParsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+        raw,
+        source_text: r?.source_text,
+      },
+    };
+  }
+  const env = envParsed.data;
+  const schema = PAYLOAD_SCHEMAS[env.intent];
+  const payloadParsed = schema.safeParse(env.payload);
+  if (!payloadParsed.success) {
+    return {
+      ok: false,
+      bad: {
+        id: env.id,
+        intent: env.intent,
+        error: payloadParsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+        raw,
+        source_text: env.source_text,
+      },
+    };
+  }
+  return {
+    ok: true,
+    op: {
+      id: env.id,
+      intent: env.intent,
+      confidence: env.confidence,
+      payload: payloadParsed.data as Record<string, unknown>,
+      source_text: env.source_text,
+      requires_confirmation: true,
+    },
+  };
+}
+
 export type ValidatedIntent =
   | { intent: "crear_linea_genetica"; confidence: number; payload: z.infer<typeof crearLineaSchema> }
   | { intent: "editar_linea_genetica"; confidence: number; payload: z.infer<typeof editarLineaSchema> }
