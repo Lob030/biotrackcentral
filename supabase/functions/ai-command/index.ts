@@ -183,20 +183,31 @@ async function actionParse(req: Request) {
     return json({ ok: true, operations: [], invalid: [], note: text });
   }
 
+  const { normalized, rejected, logs } = normalizeOperations(rawOps);
+
   const valid: ValidOperation[] = [];
   const invalid: InvalidOperation[] = [];
-  // Ensure unique ids
-  const seen = new Set<string>();
-  rawOps.forEach((r, idx) => {
-    const ro = r as any;
-    if (!ro?.id || seen.has(ro.id)) ro.id = `tmp-${idx + 1}`;
-    seen.add(ro.id);
-    const res = validateOperation(ro);
+
+  // Rejected (non-object / unparsable) entries → invalid bucket
+  rejected.forEach((r) => {
+    invalid.push({
+      id: `tmp-${r.index + 1}`,
+      error: r.reason,
+      raw: r.raw,
+    });
+  });
+
+  normalized.forEach((op) => {
+    const res = validateOperation(op);
     if (res.ok) valid.push(res.op);
     else invalid.push(res.bad);
   });
 
-  return json({ ok: true, operations: valid, invalid, note: text });
+  if (invalid.length > 0) {
+    console.warn("[ai-command] parse produced", invalid.length, "invalid op(s)");
+  }
+
+  return json({ ok: true, operations: valid, invalid, note: text, normalization: logs });
 }
 
 // Legacy single-op execute (kept for backward compatibility).
