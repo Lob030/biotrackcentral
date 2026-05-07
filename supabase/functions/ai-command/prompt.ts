@@ -29,6 +29,7 @@ Reglas estrictas:
 - SIEMPRE devuelve un único tool call \`registrar_operaciones\`.
 - Cada operación DEBE ser un objeto JSON real (NO un string con JSON dentro, NO un array).
 - Cada operación DEBE usar la clave \`payload\` para los datos. NUNCA uses \`data\`, \`args\`, \`params\` u otras variantes.
+- \`payload\` DEBE ser un objeto JSON real, NUNCA un string con JSON dentro.
 - Cada operación debe tener un \`id\` único tipo "tmp-1", "tmp-2", … en orden de aparición.
 - NUNCA mezcles dos acciones distintas en una sola operación. Sepáralas.
 - Conserva el orden en que aparecen en el texto.
