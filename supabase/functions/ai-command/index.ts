@@ -16,6 +16,7 @@ import {
   type ValidOperation,
 } from "./schemas.ts";
 import { buildSystemPrompt, type OrgContext } from "./prompt.ts";
+import { normalizeOperations } from "./normalize.ts";
 import { ResolveError } from "./resolve.ts";
 import { handleCrearLinea, handleEditarLinea } from "./handlers/lineas.ts";
 import { handleCrearCaja, handleEditarCaja } from "./handlers/cajas.ts";
