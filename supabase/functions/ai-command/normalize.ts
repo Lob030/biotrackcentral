@@ -73,6 +73,27 @@ export function normalizeOperations(rawOps: unknown[]): NormalizeResult {
       logs.push({ index, action: "data_to_payload" });
     }
 
+    // payload as JSON string → object (single-pass, no recursion)
+    if (typeof obj.payload === "string") {
+      const trimmed = obj.payload.trim();
+      if (trimmed.startsWith("{") && trimmed.length <= 20000) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (isPlainObject(parsed)) {
+            obj.payload = parsed;
+            logs.push({ index, action: "parsed_payload_string" });
+          } else {
+            logs.push({ index, action: "invalid_payload_string", detail: "Parsed payload is not an object." });
+          }
+        } catch {
+          logs.push({ index, action: "invalid_payload_string", detail: "Payload string is not valid JSON." });
+          // Leave payload as-is; zod will reject it into invalid[].
+        }
+      } else {
+        logs.push({ index, action: "invalid_payload_string", detail: "Payload string does not look like a JSON object." });
+      }
+    }
+
     // id hardening
     const currentId = typeof obj.id === "string" ? obj.id.trim() : "";
     if (!currentId) {
