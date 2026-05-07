@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_journal_runs: {
+        Row: {
+          created_at: string
+          id: string
+          invalid: Json
+          note: string
+          operations: Json
+          organization_id: string
+          results: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invalid?: Json
+          note: string
+          operations?: Json
+          organization_id: string
+          results?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invalid?: Json
+          note?: string
+          operations?: Json
+          organization_id?: string
+          results?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       alertas_personalizadas: {
         Row: {
           activa: boolean
