@@ -9,7 +9,14 @@
 
 export interface NormalizationLog {
   index: number;
-  action: "parsed_string" | "data_to_payload" | "assigned_id" | "deduped_id" | "rejected";
+  action:
+    | "parsed_string"
+    | "data_to_payload"
+    | "assigned_id"
+    | "deduped_id"
+    | "rejected"
+    | "parsed_payload_string"
+    | "invalid_payload_string";
   detail?: string;
 }
 
