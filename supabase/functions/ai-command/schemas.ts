@@ -168,6 +168,16 @@ export interface InvalidOperation {
 export function validateOperation(raw: unknown):
   | { ok: true; op: ValidOperation }
   | { ok: false; bad: InvalidOperation } {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return {
+      ok: false,
+      bad: {
+        id: "tmp-?",
+        error: `Operación no es un objeto (tipo recibido: ${Array.isArray(raw) ? "array" : typeof raw}).`,
+        raw,
+      },
+    };
+  }
   const envParsed = operationEnvelopeSchema.safeParse(raw);
   if (!envParsed.success) {
     const r = raw as any;

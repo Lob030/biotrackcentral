@@ -16,6 +16,7 @@ import {
   type ValidOperation,
 } from "./schemas.ts";
 import { buildSystemPrompt, type OrgContext } from "./prompt.ts";
+import { normalizeOperations } from "./normalize.ts";
 import { ResolveError } from "./resolve.ts";
 import { handleCrearLinea, handleEditarLinea } from "./handlers/lineas.ts";
 import { handleCrearCaja, handleEditarCaja } from "./handlers/cajas.ts";
@@ -182,20 +183,31 @@ async function actionParse(req: Request) {
     return json({ ok: true, operations: [], invalid: [], note: text });
   }
 
+  const { normalized, rejected, logs } = normalizeOperations(rawOps);
+
   const valid: ValidOperation[] = [];
   const invalid: InvalidOperation[] = [];
-  // Ensure unique ids
-  const seen = new Set<string>();
-  rawOps.forEach((r, idx) => {
-    const ro = r as any;
-    if (!ro?.id || seen.has(ro.id)) ro.id = `tmp-${idx + 1}`;
-    seen.add(ro.id);
-    const res = validateOperation(ro);
+
+  // Rejected (non-object / unparsable) entries → invalid bucket
+  rejected.forEach((r) => {
+    invalid.push({
+      id: `tmp-${r.index + 1}`,
+      error: r.reason,
+      raw: r.raw,
+    });
+  });
+
+  normalized.forEach((op) => {
+    const res = validateOperation(op);
     if (res.ok) valid.push(res.op);
     else invalid.push(res.bad);
   });
 
-  return json({ ok: true, operations: valid, invalid, note: text });
+  if (invalid.length > 0) {
+    console.warn("[ai-command] parse produced", invalid.length, "invalid op(s)");
+  }
+
+  return json({ ok: true, operations: valid, invalid, note: text, normalization: logs });
 }
 
 // Legacy single-op execute (kept for backward compatibility).
@@ -215,14 +227,22 @@ async function actionExecuteBatch(req: Request) {
   const { sb, orgId, userId } = await authedClient(req);
   const body = await req.json().catch(() => ({}));
   const note = typeof body?.note === "string" ? body.note.slice(0, 4000) : "";
-  const ops: unknown[] = Array.isArray(body?.operations) ? body.operations : [];
-  if (ops.length === 0) return json({ error: "Sin operaciones" }, 400);
-  if (ops.length > 20) return json({ error: "Demasiadas operaciones (máx 20)" }, 400);
+  const rawOps: unknown[] = Array.isArray(body?.operations) ? body.operations : [];
+  if (rawOps.length === 0) return json({ error: "Sin operaciones" }, 400);
+  if (rawOps.length > 20) return json({ error: "Demasiadas operaciones (máx 20)" }, 400);
+
+  // Defensive normalization: tolerate stringified ops, data→payload, etc.
+  const { normalized, rejected } = normalizeOperations(rawOps);
+  const ops: unknown[] = normalized;
 
   const results: Array<
     | { id: string; intent: string; status: "ok"; summary: string; affected: Record<string, unknown> }
     | { id: string; intent?: string; status: "error"; error: string }
   > = [];
+
+  rejected.forEach((r) => {
+    results.push({ id: `tmp-${r.index + 1}`, status: "error", error: r.reason });
+  });
 
   for (const raw of ops) {
     const validated = validateOperation(raw);
@@ -255,7 +275,7 @@ async function actionExecuteBatch(req: Request) {
       user_id: userId,
       note,
       operations: ops,
-      invalid: [],
+      invalid: rejected,
       results,
     });
   } catch (e) {
