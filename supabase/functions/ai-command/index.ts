@@ -1,6 +1,6 @@
-// AI Operational Copilot — single edge function with two actions: parse | execute.
-// The LLM never accesses the DB. It produces strict JSON validated by zod;
-// typed handlers perform every mutation through the Supabase client (RLS intact).
+// AI Operational Copilot — multi-operation parser with parse | execute | execute_batch.
+// LLM never accesses the DB. Output is strict JSON validated by zod;
+// typed handlers perform every mutation through the user's Supabase client (RLS intact).
 
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { zodToJsonSchema } from "npm:zod-to-json-schema@3.23.5";
@@ -9,8 +9,11 @@ import {
   INTENT_NAMES,
   PAYLOAD_SCHEMAS,
   validateIntent,
+  validateOperation,
   type IntentName,
+  type InvalidOperation,
   type ValidatedIntent,
+  type ValidOperation,
 } from "./schemas.ts";
 import { buildSystemPrompt, type OrgContext } from "./prompt.ts";
 import { ResolveError } from "./resolve.ts";
@@ -90,25 +93,39 @@ async function loadOrgContext(sb: SupabaseClient, orgId: string): Promise<OrgCon
   };
 }
 
-function buildTool() {
-  // Build a JSON schema union for the LLM tool. Each intent has its own variant.
-  const oneOf = INTENT_NAMES.map((name) => ({
+function buildBatchTool() {
+  // One operation = id + (intent + confidence + payload union).
+  const operationOneOf = INTENT_NAMES.map((name) => ({
     type: "object",
     properties: {
+      id: { type: "string", description: "tmp-1, tmp-2, …" },
       intent: { type: "string", enum: [name] },
       confidence: { type: "number" },
       payload: zodToJsonSchema(PAYLOAD_SCHEMAS[name as IntentName] as any, { target: "openApi3" }),
+      source_text: { type: "string", description: "Fragmento literal de la nota" },
     },
-    required: ["intent", "confidence", "payload"],
+    required: ["id", "intent", "confidence", "payload"],
     additionalProperties: false,
   }));
 
   return {
     type: "function" as const,
     function: {
-      name: "registrar_intencion",
-      description: "Registra UNA intención operativa estructurada para BioTrack.",
-      parameters: { oneOf },
+      name: "registrar_operaciones",
+      description: "Extrae TODAS las operaciones de la nota como elementos independientes.",
+      parameters: {
+        type: "object",
+        properties: {
+          operations: {
+            type: "array",
+            minItems: 1,
+            maxItems: 20,
+            items: { oneOf: operationOneOf },
+          },
+        },
+        required: ["operations"],
+        additionalProperties: false,
+      },
     },
   };
 }
@@ -127,8 +144,8 @@ async function callLLM(systemPrompt: string, userText: string) {
         { role: "system", content: systemPrompt + `\nFecha de hoy: ${today}.` },
         { role: "user", content: userText },
       ],
-      tools: [buildTool()],
-      tool_choice: { type: "function", function: { name: "registrar_intencion" } },
+      tools: [buildBatchTool()],
+      tool_choice: { type: "function", function: { name: "registrar_operaciones" } },
     }),
   });
   if (resp.status === 429) throw new ResolveError("Demasiadas solicitudes. Intenta de nuevo en un momento.", 429);
@@ -140,8 +157,8 @@ async function callLLM(systemPrompt: string, userText: string) {
   }
   const data = await resp.json();
   const call = data?.choices?.[0]?.message?.tool_calls?.[0];
-  if (!call) throw new ResolveError("La IA no produjo una intención válida.", 422);
-  let args: unknown;
+  if (!call) throw new ResolveError("La IA no produjo operaciones válidas.", 422);
+  let args: any;
   try {
     args = typeof call.function.arguments === "string" ? JSON.parse(call.function.arguments) : call.function.arguments;
   } catch {
@@ -155,34 +172,99 @@ async function actionParse(req: Request) {
   const body = await req.json().catch(() => ({}));
   const text = String(body?.text ?? "").trim();
   if (!text) return json({ error: "Texto vacío" }, 400);
-  if (text.length > 1000) return json({ error: "Comando demasiado largo" }, 400);
+  if (text.length > 4000) return json({ error: "Nota demasiado larga (máx 4000 caracteres)" }, 400);
 
   const ctx = await loadOrgContext(sb, orgId);
   const prompt = buildSystemPrompt(ctx);
   const raw = await callLLM(prompt, text);
-  const intent = validateIntent(raw);
-  return json({
-    ok: true,
-    intent: intent.intent,
-    confidence: intent.confidence,
-    payload: intent.payload,
-    requires_confirmation: true,
+  const rawOps: unknown[] = Array.isArray(raw?.operations) ? raw.operations : [];
+  if (rawOps.length === 0) {
+    return json({ ok: true, operations: [], invalid: [], note: text });
+  }
+
+  const valid: ValidOperation[] = [];
+  const invalid: InvalidOperation[] = [];
+  // Ensure unique ids
+  const seen = new Set<string>();
+  rawOps.forEach((r, idx) => {
+    const ro = r as any;
+    if (!ro?.id || seen.has(ro.id)) ro.id = `tmp-${idx + 1}`;
+    seen.add(ro.id);
+    const res = validateOperation(ro);
+    if (res.ok) valid.push(res.op);
+    else invalid.push(res.bad);
   });
+
+  return json({ ok: true, operations: valid, invalid, note: text });
 }
 
+// Legacy single-op execute (kept for backward compatibility).
 async function actionExecute(req: Request) {
   const { sb, orgId, userId } = await authedClient(req);
   const body = await req.json().catch(() => ({}));
   const intent = validateIntent(body) as ValidatedIntent;
   const handler = HANDLERS[intent.intent] as (
-    sb: SupabaseClient,
-    orgId: string,
-    userId: string,
-    payload: any,
+    sb: SupabaseClient, orgId: string, userId: string, payload: any,
   ) => Promise<{ ok: true; summary: string; affected: Record<string, unknown> }>;
   if (!handler) throw new ResolveError(`Intención no soportada: ${intent.intent}`, 400);
   const result = await handler(sb, orgId, userId, intent.payload);
   return json(result);
+}
+
+async function actionExecuteBatch(req: Request) {
+  const { sb, orgId, userId } = await authedClient(req);
+  const body = await req.json().catch(() => ({}));
+  const note = typeof body?.note === "string" ? body.note.slice(0, 4000) : "";
+  const ops: unknown[] = Array.isArray(body?.operations) ? body.operations : [];
+  if (ops.length === 0) return json({ error: "Sin operaciones" }, 400);
+  if (ops.length > 20) return json({ error: "Demasiadas operaciones (máx 20)" }, 400);
+
+  const results: Array<
+    | { id: string; intent: string; status: "ok"; summary: string; affected: Record<string, unknown> }
+    | { id: string; intent?: string; status: "error"; error: string }
+  > = [];
+
+  for (const raw of ops) {
+    const validated = validateOperation(raw);
+    if (!validated.ok) {
+      results.push({ id: validated.bad.id, intent: validated.bad.intent, status: "error", error: validated.bad.error });
+      continue;
+    }
+    const op = validated.op;
+    const handler = HANDLERS[op.intent] as (
+      sb: SupabaseClient, orgId: string, userId: string, payload: any,
+    ) => Promise<{ ok: true; summary: string; affected: Record<string, unknown> }>;
+    if (!handler) {
+      results.push({ id: op.id, intent: op.intent, status: "error", error: `Intención no soportada: ${op.intent}` });
+      continue;
+    }
+    try {
+      const r = await handler(sb, orgId, userId, op.payload);
+      results.push({ id: op.id, intent: op.intent, status: "ok", summary: r.summary, affected: r.affected });
+    } catch (e) {
+      const msg = e instanceof ResolveError ? e.message : (e instanceof Error ? e.message : "Error desconocido");
+      console.error("execute_batch op failed", op.id, op.intent, msg);
+      results.push({ id: op.id, intent: op.intent, status: "error", error: msg });
+    }
+  }
+
+  // Audit (best-effort, never fails the batch)
+  try {
+    await sb.from("ai_journal_runs").insert({
+      organization_id: orgId,
+      user_id: userId,
+      note,
+      operations: ops,
+      invalid: [],
+      results,
+    });
+  } catch (e) {
+    console.error("ai_journal_runs insert failed", e);
+  }
+
+  const okCount = results.filter((r) => r.status === "ok").length;
+  const errCount = results.length - okCount;
+  return json({ ok: true, results, summary: `${okCount} ejecutada(s), ${errCount} con error.` });
 }
 
 Deno.serve(async (req) => {
@@ -192,6 +274,7 @@ Deno.serve(async (req) => {
     const action = url.searchParams.get("action") ?? "parse";
     if (action === "parse") return await actionParse(req);
     if (action === "execute") return await actionExecute(req);
+    if (action === "execute_batch") return await actionExecuteBatch(req);
     return json({ error: "Acción desconocida" }, 400);
   } catch (e) {
     if (e instanceof ZodError) {

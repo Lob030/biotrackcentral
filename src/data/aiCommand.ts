@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// ───────── Legacy single-intent types (kept for compatibility) ─────────
 export interface ParsedIntent {
   ok: true;
   intent: string;
@@ -7,14 +8,43 @@ export interface ParsedIntent {
   payload: Record<string, unknown>;
   requires_confirmation: boolean;
 }
-
 export interface ExecuteResult {
   ok: true;
   summary: string;
   affected: Record<string, unknown>;
 }
 
-async function call(action: "parse" | "execute", body: unknown) {
+// ───────── Multi-operation (batch) types ─────────
+export interface ParsedOperation {
+  id: string;
+  intent: string;
+  confidence: number;
+  payload: Record<string, unknown>;
+  source_text?: string;
+  requires_confirmation: true;
+}
+export interface InvalidOperation {
+  id: string;
+  intent?: string;
+  error: string;
+  source_text?: string;
+}
+export interface BatchParseResult {
+  ok: true;
+  operations: ParsedOperation[];
+  invalid: InvalidOperation[];
+  note: string;
+}
+export type OperationExecutionResult =
+  | { id: string; intent: string; status: "ok"; summary: string; affected: Record<string, unknown> }
+  | { id: string; intent?: string; status: "error"; error: string };
+export interface BatchExecuteResult {
+  ok: true;
+  results: OperationExecutionResult[];
+  summary: string;
+}
+
+async function call(action: "parse" | "execute" | "execute_batch", body: unknown) {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
   if (!token) throw new Error("Sesión expirada");
@@ -29,18 +59,30 @@ async function call(action: "parse" | "execute", body: unknown) {
     body: JSON.stringify(body),
   });
   const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    throw new Error(data?.error || `Error ${resp.status}`);
-  }
+  if (!resp.ok) throw new Error(data?.error || `Error ${resp.status}`);
   return data;
 }
 
-export const parseCommand = (text: string) => call("parse", { text }) as Promise<ParsedIntent>;
-export const executeCommand = (intent: {
-  intent: string;
-  confidence: number;
-  payload: Record<string, unknown>;
-}) => call("execute", intent) as Promise<ExecuteResult>;
+// Batch API (primary path)
+export const parseBatch = (text: string) => call("parse", { text }) as Promise<BatchParseResult>;
+export const executeBatch = (note: string, operations: ParsedOperation[]) =>
+  call("execute_batch", { note, operations }) as Promise<BatchExecuteResult>;
+
+// Legacy wrappers (still supported by edge function)
+export const parseCommand = async (text: string): Promise<ParsedIntent> => {
+  const r = await parseBatch(text);
+  const first = r.operations[0];
+  if (!first) throw new Error(r.invalid[0]?.error ?? "Sin operaciones detectadas");
+  return {
+    ok: true,
+    intent: first.intent,
+    confidence: first.confidence,
+    payload: first.payload,
+    requires_confirmation: true,
+  };
+};
+export const executeCommand = (intent: { intent: string; confidence: number; payload: Record<string, unknown> }) =>
+  call("execute", intent) as Promise<ExecuteResult>;
 
 export const INTENT_LABELS: Record<string, string> = {
   crear_linea_genetica: "Crear línea genética",
