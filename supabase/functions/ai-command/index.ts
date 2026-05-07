@@ -275,7 +275,7 @@ async function actionExecuteBatch(req: Request) {
       user_id: userId,
       note,
       operations: ops,
-      invalid: [],
+      invalid: rejected,
       results,
     });
   } catch (e) {
