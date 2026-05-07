@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { friendlyError } from "@/lib/errors";
 import { useClientesList, useUpsertCliente, useDeleteCliente } from "@/data/clientes";
 import type { ClienteRow } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useSessionState } from "@/hooks/useSessionState";
 
 type Cliente = ClienteRow;
 
@@ -34,11 +36,19 @@ export default function Clientes() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const [search, setSearch] = useState("");
-  const [filterTipo, setFilterTipo] = useState("all");
-  const [filterEstado, setFilterEstado] = useState("activo");
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Cliente | null>(null);
+  const [search, setSearch] = useSessionState("clientes.search", "");
+  const [filterTipo, setFilterTipo] = useSessionState("clientes.filterTipo", "all");
+  const [filterEstado, setFilterEstado] = useSessionState("clientes.filterEstado", "activo");
+  const [open, setOpen] = useSessionState("clientes.modalOpen", false);
+  const [editing, setEditing] = useSessionState<Cliente | null>("clientes.editing", null);
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const nombreRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => nombreRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [open]);
 
   const [form, setForm] = useState({
     nombre: "",
@@ -120,7 +130,7 @@ export default function Clientes() {
 
   const filtered = clientes.filter((c) => {
     if (filterTipo !== "all" && c.tipo_cliente !== filterTipo) return false;
-    const q = search.toLowerCase();
+    const q = debouncedSearch.toLowerCase();
     if (q && !c.nombre.toLowerCase().includes(q) && !(c.email ?? "").toLowerCase().includes(q)) return false;
     return true;
   });
@@ -209,10 +219,16 @@ export default function Clientes() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader><DialogTitle className="display-font">{editing ? "Editar cliente" : "Nuevo cliente"}</DialogTitle></DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <form
+            className="space-y-4 max-h-[60vh] overflow-y-auto"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit();
+            }}
+          >
             <div className="space-y-2">
               <Label>Nombre *</Label>
-              <Input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+              <Input ref={nombreRef} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -244,13 +260,13 @@ export default function Clientes() {
               <div className="space-y-2"><Label>RFC</Label><Input value={form.rfc} onChange={(e) => setForm({ ...form, rfc: e.target.value })} /></div>
             </div>
             <div className="space-y-2"><Label>Notas</Label><Textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} rows={2} /></div>
-          </div>
-          <DialogFooter>
+            <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={submit} disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
+            <Button type="submit" disabled={!form.nombre || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
               {editing ? "Guardar" : "Crear cliente"}
             </Button>
-          </DialogFooter>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

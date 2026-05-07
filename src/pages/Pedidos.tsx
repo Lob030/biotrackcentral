@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,6 +15,8 @@ import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } fro
 import { useClienteOptionsActivos } from "@/data/options";
 import { invalidatePedidos } from "@/lib/invalidations";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useSessionState } from "@/hooks/useSessionState";
 
 interface Pedido {
   id: string;
@@ -50,11 +52,18 @@ export default function Pedidos() {
   const { profile } = useAuth();
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const [search, setSearch] = useState("");
-  const [filterEstado, setFilterEstado] = useState("all");
+  const [search, setSearch] = useSessionState("pedidos.search", "");
+  const [filterEstado, setFilterEstado] = useSessionState("pedidos.filterEstado", "all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Pedido | null>(null);
   const [viewOpen, setViewOpen] = useState<Pedido | null>(null);
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const numeroRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => numeroRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [open]);
 
   const [form, setForm] = useState({
     numero_pedido: "",
@@ -85,7 +94,8 @@ export default function Pedidos() {
   // Stock en vivo: suma cantidad_actual de lotes activos agrupados por especie+etapa (calculada).
   const { data: stockMap = {} } = useQuery({
     queryKey: ["stock-por-etapa"],
-    refetchInterval: 5000,
+    enabled: open,
+    refetchInterval: open ? 20_000 : false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lotes")
@@ -232,7 +242,7 @@ export default function Pedidos() {
   };
 
   const filtered = pedidos.filter((p) => {
-    const q = search.toLowerCase();
+    const q = debouncedSearch.toLowerCase();
     if (q && !p.numero_pedido.toLowerCase().includes(q) && !(p.clientes?.nombre ?? "").toLowerCase().includes(q)) return false;
     return true;
   });
@@ -311,11 +321,11 @@ export default function Pedidos() {
         <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="display-font">{editing ? "Editar pedido" : "Nuevo pedido"}</DialogTitle></DialogHeader>
 
-          <div className="space-y-4">
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); upsert.mutate(); }}>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label>Número *</Label>
-                <Input value={form.numero_pedido} onChange={(e) => setForm({ ...form, numero_pedido: e.target.value })} />
+                <Input ref={numeroRef} value={form.numero_pedido} onChange={(e) => setForm({ ...form, numero_pedido: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Cliente *</Label>
@@ -451,18 +461,17 @@ export default function Pedidos() {
                 </div>
               </div>
             )}
-          </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button
-              onClick={() => upsert.mutate()}
+              type="submit"
               disabled={!form.numero_pedido || !form.cliente_id || detalles.length === 0 || upsert.isPending}
               className="bg-gradient-primary text-primary-foreground hover:opacity-90"
             >
               {editing ? "Guardar" : "Crear pedido"}
             </Button>
           </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

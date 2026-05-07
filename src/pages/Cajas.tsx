@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, MapPin, Pencil, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { clearErrorsOnDialogClose, optionalTrimmedString, requiredTrimmedString, toNullIfBlank } from "@/lib/form-utils";
 import { cn } from "@/lib/utils";
 import { useCajasList, useUpsertCaja, useDeleteCaja } from "@/data/cajas";
 import type { CajaRow } from "@/lib/types";
@@ -16,8 +20,24 @@ import { CardGridSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useSessionState } from "@/hooks/useSessionState";
 
 type Caja = CajaRow;
+
+const cajaFormSchema = z.object({
+  codigo: requiredTrimmedString("El codigo es obligatorio"),
+  ubicacion: optionalTrimmedString(),
+  capacidad: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^[0-9]+$/.test(v), "Capacidad debe ser un número entero")
+    .refine((v) => v === "" || Number(v) >= 0, "Capacidad no puede ser negativa"),
+  uso: z.enum(["reproductor", "engorda"]),
+  estado: z.enum(["libre", "ocupada", "limpieza"]),
+  notas: optionalTrimmedString(),
+});
+
+type CajaFormValues = z.infer<typeof cajaFormSchema>;
 
 const ESTADO_COLORS = {
   libre: "bg-success/15 text-success border-success/30",
@@ -28,18 +48,28 @@ const ESTADO_COLORS = {
 export default function Cajas() {
   const { profile } = useAuth();
   const confirm = useConfirm();
-  const [filterUso, setFilterUso] = useState("all");
-  const [filterEstado, setFilterEstado] = useState("all");
+  const [filterUso, setFilterUso] = useSessionState("cajas.filterUso", "all");
+  const [filterEstado, setFilterEstado] = useSessionState("cajas.filterEstado", "all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Caja | null>(null);
+  const codigoRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => codigoRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [open]);
 
-  const [form, setForm] = useState({
-    codigo: "",
-    ubicacion: "",
-    capacidad: "",
-    uso: "engorda" as "reproductor" | "engorda",
-    estado: "libre" as "libre" | "ocupada" | "limpieza",
-    notas: "",
+  const form = useForm<CajaFormValues>({
+    resolver: zodResolver(cajaFormSchema),
+    defaultValues: {
+      codigo: "",
+      ubicacion: "",
+      capacidad: "",
+      uso: "engorda",
+      estado: "libre",
+      notas: "",
+    },
+    mode: "onBlur",
   });
 
   const cajasQuery = useCajasList();
@@ -59,7 +89,7 @@ export default function Cajas() {
     onError: (e) => toast.error(friendlyError(e)),
   });
 
-  const submit = () => {
+  const submit = (values: CajaFormValues) => {
     if (!profile) {
       toast.error(friendlyError(new Error("Sin perfil")));
       return;
@@ -67,12 +97,12 @@ export default function Cajas() {
     upsert.mutate({
       id: editing?.id,
       payload: {
-        codigo: form.codigo,
-        ubicacion: form.ubicacion || null,
-        capacidad: form.capacidad ? parseInt(form.capacidad) : null,
-        uso: form.uso,
-        estado: form.estado,
-        notas: form.notas || null,
+        codigo: values.codigo.trim(),
+        ubicacion: toNullIfBlank(values.ubicacion),
+        capacidad: values.capacidad ? Number(values.capacidad) : null,
+        uso: values.uso,
+        estado: values.estado,
+        notas: toNullIfBlank(values.notas),
         organization_id: profile.organization_id,
       },
     });
@@ -80,13 +110,13 @@ export default function Cajas() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ codigo: "", ubicacion: "", capacidad: "", uso: "engorda", estado: "libre", notas: "" });
+    form.reset({ codigo: "", ubicacion: "", capacidad: "", uso: "engorda", estado: "libre", notas: "" });
     setOpen(true);
   };
 
   const openEdit = (c: Caja) => {
     setEditing(c);
-    setForm({
+    form.reset({
       codigo: c.codigo, ubicacion: c.ubicacion ?? "", capacidad: c.capacidad?.toString() ?? "",
       uso: c.uso, estado: c.estado, notas: c.notas ?? "",
     });
@@ -203,34 +233,36 @@ export default function Cajas() {
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(next) => clearErrorsOnDialogClose(next, setOpen, form)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader><DialogTitle className="display-font">{editing ? "Editar caja" : "Nueva caja"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+          <form className="space-y-4" onSubmit={form.handleSubmit(submit)}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Código *</Label>
-                <Input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="Ej: R-01" />
+                <Input ref={codigoRef} value={form.watch("codigo")} onChange={(e) => form.setValue("codigo", e.target.value, { shouldValidate: true })} placeholder="Ej: R-01" />
+                {form.formState.errors.codigo && <p className="text-xs text-destructive">{form.formState.errors.codigo.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Ubicación</Label>
-                <Input value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Ej: Sala A, estante 2" />
+                <Input value={form.watch("ubicacion") ?? ""} onChange={(e) => form.setValue("ubicacion", e.target.value, { shouldValidate: true })} placeholder="Ej: Sala A, estante 2" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Uso *</Label>
-                <Select value={form.uso} onValueChange={(v: any) => setForm({ ...form, uso: v })}>
+                <Select value={form.watch("uso")} onValueChange={(v: "reproductor" | "engorda") => form.setValue("uso", v, { shouldValidate: true })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="engorda">Engorda</SelectItem>
                     <SelectItem value="reproductor">Reproductor</SelectItem>
                   </SelectContent>
                 </Select>
+                {form.formState.errors.uso && <p className="text-xs text-destructive">{form.formState.errors.uso.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Estado</Label>
-                <Select value={form.estado} onValueChange={(v: any) => setForm({ ...form, estado: v })}>
+                <Select value={form.watch("estado")} onValueChange={(v: "libre" | "ocupada" | "limpieza") => form.setValue("estado", v, { shouldValidate: true })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="libre">Libre</SelectItem>
@@ -238,21 +270,23 @@ export default function Cajas() {
                     <SelectItem value="limpieza">Limpieza</SelectItem>
                   </SelectContent>
                 </Select>
+                {form.formState.errors.estado && <p className="text-xs text-destructive">{form.formState.errors.estado.message}</p>}
               </div>
             </div>
             <div className="space-y-2">
               <Label>Capacidad (individuos)</Label>
-              <Input type="number" value={form.capacidad} onChange={(e) => setForm({ ...form, capacidad: e.target.value })} />
+              <Input type="number" min={0} step={1} value={form.watch("capacidad")} onChange={(e) => form.setValue("capacidad", e.target.value, { shouldValidate: true })} />
+              {form.formState.errors.capacidad && <p className="text-xs text-destructive">{form.formState.errors.capacidad.message}</p>}
             </div>
             <div className="space-y-2">
               <Label>Notas</Label>
-              <Textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} rows={2} />
+              <Textarea value={form.watch("notas") ?? ""} onChange={(e) => form.setValue("notas", e.target.value, { shouldValidate: true })} rows={2} />
             </div>
-          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={submit} disabled={!form.codigo || upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear caja"}</Button>
+            <Button type="submit" disabled={upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear caja"}</Button>
           </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
