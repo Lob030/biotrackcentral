@@ -1,208 +1,167 @@
+# Multi-Operation AI Copilot — Operational Journal Parser
 
-# AI Operational Copilot — Architecture & Implementation Plan
+## Goal
 
-A structured copilot that turns natural language into validated **operational intents**. The LLM is sandboxed: it never touches the database, never writes SQL, never executes anything. It produces JSON. The backend validates and routes to typed handlers that use the existing Supabase client (with RLS intact).
+Upgrade the Copilot from "one command → one intent" to "one operational note → N validated intents", reviewed and executed as a batch, while preserving the existing parse/execute separation, RLS, typed handlers, zod validation and audit logs.
 
----
-
-## 1. Architecture Overview
+## Architecture overview
 
 ```text
- ┌────────────────────┐    natural language    ┌────────────────────────────┐
- │  AICommandBar (⌘K) │ ─────────────────────► │ edge fn: ai-command/parse  │
- └────────────────────┘                        │  • auth user (getClaims)   │
-          ▲                                    │  • load org context        │
-          │ structured intent JSON             │  • call Lovable AI         │
-          │                                    │  • validate JSON (zod)     │
-          │                                    │  • resolve refs (lote/caja)│
-          │                                    │  • return preview          │
-          ▼                                    └─────────────┬──────────────┘
- ┌────────────────────┐                                      │
- │  AIResultPreview   │ ◄────────────────────────────────────┘
- │  AIConfirmDialog   │
- └─────────┬──────────┘ user confirms
-           │
-           ▼
- ┌────────────────────────────┐
- │ edge fn: ai-command/execute│
- │  • re-auth                 │
- │  • re-validate intent      │
- │  • dispatch typed handler  │
- │  • write via Supabase RLS  │
- │  • emit lote_eventos audit │
- └────────────────────────────┘
+ ┌──────────────┐       ┌─────────────────────┐      ┌────────────────────┐
+ │ user note    │──────▶│ /ai-command?action= │─────▶│ LLM (tool calling) │
+ │ (free text)  │       │   parse             │      │  → operations[]    │
+ └──────────────┘       └──────────┬──────────┘      └──────────┬─────────┘
+                                   │ zod validate per op        │
+                                   ▼                            │
+                        ┌──────────────────────┐                │
+                        │ batch envelope:      │◀───────────────┘
+                        │  valid[] + invalid[] │
+                        └──────────┬───────────┘
+                                   ▼
+                       ┌──────────────────────┐
+                       │ AIOperationBatch     │  user reviews,
+                       │ Preview (cards)      │  toggles, edits selection
+                       └──────────┬───────────┘
+                                  ▼
+                       ┌──────────────────────┐
+                       │ /ai-command?action=  │  sequential, per-op
+                       │   execute_batch      │  re-validation + handler
+                       └──────────────────────┘
 ```
 
-**Two endpoints, one function** (`ai-command` with `?action=parse|execute`). Parse and execute are split so the LLM is never on the write path — the preview the user sees is exactly what executes.
+The LLM still produces only structured JSON via tool calling. It never touches the DB, never emits SQL, never performs autonomous execution. Each operation is independently validated, previewed, and explicitly approved by the user before any handler runs.
 
----
+## What changes vs current
 
-## 2. Security Boundaries
+- `parse` returns a **batch** of operations (1..N) instead of a single intent. Single-intent UI keeps working — a 1-op batch renders as a single card.
+- A new `execute_batch` action runs operations sequentially; each op is re-validated server-side with the same zod schema and dispatched to the existing typed handler. Per-op success/failure is captured.
+- New UI: a batch preview with one card per operation, toggles to include/exclude, and clear error messages for invalid operations. Partial execution is the default.
+- New audit log table `ai_journal_runs` records the original note, extracted operations, and per-op execution results.
 
-1. **LLM output is data, not code.** It returns one JSON object matching a strict zod schema. Anything else is rejected.
-2. **No SQL ever leaves the LLM.** Handlers use the typed Supabase client with parameterized values.
-3. **RLS is preserved.** The edge function creates a Supabase client with the user's JWT (`Authorization` header forwarded). Every write goes through RLS — the LLM cannot bypass tenant isolation.
-4. **Re-validation on execute.** The execute endpoint re-parses the intent server-side; the client cannot tamper with the payload between preview and execute.
-5. **Reference resolution server-side.** "Lote C57-22" is resolved to a UUID via a scoped query in the user's org. If multiple matches → ambiguity error returned to UI for disambiguation.
-6. **Quantity / sex / enum validation** done in zod + handler-level checks (e.g. `cantidad > 0`, `cantidad <= lote.cantidad_actual`).
-7. **Audit trail.** Mortality, transfers, and splits emit `lote_eventos` rows (existing `aplicar_evento_lote` trigger handles stock side-effects). `created_by = auth.uid()` is enforced by existing RLS + immutability trigger.
-8. **Rate limit & error pass-through** for 402/429 from Lovable AI Gateway.
+## Schema additions (zod)
 
----
+In `supabase/functions/ai-command/schemas.ts`:
 
-## 3. Intent Catalog (zod schemas)
+- New `operationSchema` = current intent envelope + a string `id` (`tmp-1`, `tmp-2`, …) to correlate parse → execute.
+- New `batchEnvelopeSchema = z.object({ operations: z.array(operationSchema).min(1).max(20) })`.
+- `validateOperation(raw)` mirrors current `validateIntent` but returns `{ ok: true, op } | { ok: false, id, intent?, raw, error }` so invalid ops do not abort the batch.
 
-All intents share an envelope:
-```ts
-{ intent: IntentName, confidence: number, payload: <intent-specific> }
-```
+No existing intent schemas change. No DB schema changes for intents themselves.
 
-| Intent | Payload (validated) |
-|---|---|
-| `crear_linea_genetica` | `{ nombre, especie, origen?, color_etiqueta? }` |
-| `editar_linea_genetica` | `{ ref: string \| id, cambios: { nombre?, origen?, color_etiqueta? } }` |
-| `crear_caja` | `{ codigos: string[], ubicacion?, capacidad?, uso }` (batch via array) |
-| `editar_caja` | `{ ref, cambios: { ubicacion?, capacidad?, estado? } }` |
-| `crear_lote` | `{ codigo, especie, fecha_nacimiento, linea_genetica?, cantidad_inicial?, machos?, hembras?, caja? }` |
-| `editar_lote` | `{ ref, cambios: { codigo?, estado?, notas?, caja? } }` |
-| `registrar_mortalidad` | `{ lote?: string, caja?: string, cantidad, sexo?: 'macho'\|'hembra'\|'mixto', fecha?, notas? }` |
-| `trasladar_animales` | `{ lote_origen, caja_destino, cantidad, sexo?, fecha?, notas? }` |
-| `dividir_lote` | `{ lote_origen, movimientos: [{ sexo?, cantidad, caja, codigo_nuevo? }] }` |
+## Edge function changes (`supabase/functions/ai-command/index.ts`)
 
----
+- `actionParse`:
+  - Same auth + org context loading.
+  - New tool definition `registrar_operaciones` whose `parameters` is `{ operations: [ oneOf <intent variants with id> ] }` with `min 1, max 20`.
+  - Updated system prompt: "Extract ALL operations present in the note as separate items. Preserve order. If a sentence is ambiguous, include it with confidence < 0.6. Never merge unrelated operations."
+  - After the LLM returns, validate the envelope, then validate each operation independently. Return:
+    ```json
+    {
+      "ok": true,
+      "operations": [ { "id", "intent", "confidence", "payload", "requires_confirmation": true } ],
+      "invalid":   [ { "id", "intent?", "error", "raw" } ]
+    }
+    ```
+- `actionExecuteBatch` (new, `?action=execute_batch`):
+  - Accepts `{ note?: string, operations: ValidatedOperation[] }`.
+  - Re-auths, re-validates each op with zod, then calls the existing `HANDLERS[intent]` sequentially.
+  - Captures `{ id, status: "ok" | "error", summary?, affected?, error? }` per op. One failing op does NOT abort the rest, but destructive ops that depend on a prior op's resolved ref simply fail their own ref-resolution step (handlers already throw `ResolveError`).
+  - Writes one row to `ai_journal_runs` with the original note, operations, and results.
+- Backward-compat: `actionExecute` (single op) is kept. Frontend single-shot flows still work.
 
-## 4. Backend — `supabase/functions/ai-command/`
+## Frontend changes
 
-Single file `index.ts` exporting two handlers behind `?action=`.
+- `src/data/aiCommand.ts`:
+  - New types `BatchParseResult`, `ValidatedOperation`, `OperationExecutionResult`.
+  - New `parseBatch(text)` → calls `?action=parse` (now returns batch shape).
+  - New `executeBatch(note, operations)` → calls `?action=execute_batch`.
+  - Keep `parseCommand` / `executeCommand` as thin wrappers for compatibility.
 
-### 4.1 `parse`
-1. `getClaims(token)` → user id.
-2. Load org id via `profiles`.
-3. Build a compact context string for the LLM:
-   ```
-   Lotes activos: [C57-22, BALB-03, ...]
-   Cajas: [A1, A2, B1, ...]
-   Líneas: [C57BL/6, CD1, ...]
-   Especies válidas: ASF, Raton, Rata
-   ```
-   (Top N most-recent of each, ~50 names each, keeps prompt small.)
-4. Call Lovable AI (`google/gemini-3-flash-preview`) with **tool calling** to force structured output (`response_intent` tool with the union schema). System prompt: "You are BioTrack Copilot. Return exactly one tool call. Never invent IDs. If unclear, set confidence < 0.6."
-5. Validate the tool-call args with zod. Reject anything else.
-6. Resolve textual refs ("C57-22", "A1") → DB rows in the user's org. Build a `preview` object with human-readable labels + resolved IDs + warnings (e.g. "lote tiene 12 animales, traslado pide 20").
-7. Return `{ intent, payload, resolved, warnings, requires_confirmation: true }`.
+- New components in `src/components/ai/`:
+  - `AIOperationCard.tsx` — single op card: intent label, confidence chip, payload table (reuses logic from current `AIResultPreview`), include/exclude toggle, low-confidence + destructive warnings, post-execution status badge (✓ ok / ✗ error + message).
+  - `AIValidationWarnings.tsx` — banner listing invalid operations from parse phase with reason and the original snippet.
+  - `AIOperationBatchPreview.tsx` — full preview dialog: header summary ("3 operaciones detectadas, 2 seleccionadas"), invalid warnings, scrollable list of `AIOperationCard`, footer with "Ejecutar 2 operaciones" / Cancel. Disables run when nothing selected. After execution, re-renders cards with their result statuses and offers a "Cerrar" button.
 
-### 4.2 `execute`
-1. Re-auth, re-load org.
-2. Re-validate the **resolved payload** sent by the client (zod).
-3. Re-resolve refs by ID (defense-in-depth — no name lookup at this stage).
-4. Dispatch:
+- `AICommandBar.tsx` updates:
+  - Switch input from `<Input />` to `<Textarea />` (auto-grow, multi-line) so users can paste journals.
+  - On submit, call `parseBatch`. Open `AIOperationBatchPreview` instead of `AIConfirmationDialog`.
+  - Examples list updated to include a multi-line journal example.
+  - Keep ⌘K shortcut and floating launcher.
 
-```ts
-const handlers = {
-  crear_linea_genetica: handleCrearLinea,
-  editar_linea_genetica: handleEditarLinea,
-  crear_caja: handleCrearCaja,
-  editar_caja: handleEditarCaja,
-  crear_lote: handleCrearLote,
-  editar_lote: handleEditarLote,
-  registrar_mortalidad: handleMortalidad,   // inserts lote_eventos type='mortalidad'
-  trasladar_animales: handleTraslado,        // lote_eventos type='traslado_caja'
-  dividir_lote: handleDividirLote,           // creates child lotes + traslado events
-};
-```
+- `AIConfirmationDialog.tsx` is no longer the primary path but stays for any single-intent callers.
 
-Each handler:
-- accepts `(supabase, orgId, userId, payload)`,
-- runs entity-specific safety checks,
-- returns `{ ok: true, summary: string, affected: {...} }`,
-- throws typed errors mapped to HTTP 400/403/404/409.
+## Database additions (audit)
 
-### 4.3 File layout
-```
-supabase/functions/ai-command/
-  index.ts              // routing + auth
-  prompt.ts             // system prompt + context builder
-  schemas.ts            // zod intent schemas (shared)
-  resolve.ts            // textual ref → DB row
-  handlers/
-    lineas.ts
-    cajas.ts
-    lotes.ts
-    mortalidad.ts
-    traslados.ts
-    division.ts
-```
+New table `ai_journal_runs` (only addition, no edits to existing tables):
 
----
+- `organization_id uuid`, `user_id uuid`, `note text`, `operations jsonb`, `results jsonb`, `created_at timestamptz default now()`.
+- RLS: select/insert restricted to `organization_id = get_user_org(auth.uid())` and `user_id = auth.uid()` for insert. No update, no delete.
+- Insert performed from the edge function under the user's JWT (RLS enforced).
 
-## 5. Frontend
+## Validation strategy
 
-### 5.1 Components (in `src/components/ai/`)
-- **`AICommandBar.tsx`** — floating button + ⌘K dialog with input. Submits to `parse`. Shows loading shimmer.
-- **`AIResultPreview.tsx`** — renders the structured preview: intent label, resolved entities (with badges), affected counts, warnings. Uses existing semantic tokens (`glass-card`, `page-title`, etc.).
-- **`AIConfirmationDialog.tsx`** — wraps preview, "Cancelar" / "Ejecutar" buttons. Dangerous intents (mortalidad, dividir_lote, editar with destructive changes) require an explicit second click. Hooks into existing `ConfirmDialogProvider` style.
+1. **Envelope validation**: the LLM tool call must match `batchEnvelopeSchema` (1..20 ops). If not, return 422.
+2. **Per-operation validation**: each op runs through its existing intent zod schema. Failures become `invalid[]` entries with a human-readable error; they do NOT block the rest.
+3. **Re-validation on execute**: every op is re-parsed by zod on `execute_batch` so a tampered payload from the client is rejected.
+4. **Reference resolution**: handlers continue to resolve textual refs (`A1`, `C57-22`) inside the user's org via existing `resolve.ts`. Unknown refs surface as per-op errors.
+5. **Confidence**: ops with `confidence < 0.6` are marked low-confidence in the UI and pre-unchecked, forcing explicit user opt-in.
 
-### 5.2 Wiring
-- Mount `AICommandBar` in `AppLayout.tsx` (only inside protected layout, so it's auth-only).
-- Global `Cmd/Ctrl + K` keyboard shortcut.
-- After successful execute → invalidate relevant React Query keys via existing `invalidations.ts` helpers (`invalidateLotes`, `invalidateCajas`, etc.) + sonner toast with the handler's `summary`.
+## Partial execution handling
 
-### 5.3 Data layer
-- `src/data/aiCommand.ts` — two thin functions `parseCommand(text)` and `executeCommand(intent)` calling `supabase.functions.invoke('ai-command', { body: ... })`.
+- Server executes only the operations the client sends, in array order.
+- Each handler call is wrapped in try/catch; a thrown error becomes `{ status: "error", error: msg }` for that op only; the loop continues.
+- Response shape:
+  ```json
+  { "ok": true, "results": [ { "id": "tmp-1", "status": "ok", "summary": "...", "affected": {...} },
+                             { "id": "tmp-2", "status": "error", "error": "Caja A9 no existe" } ] }
+  ```
+- UI replaces each card's footer with its result; user can re-open the bar and re-issue corrections for the failed ones.
 
----
+## Safety boundaries (preserved)
 
-## 6. Validation Rules (handler-level)
+- LLM output is constrained to the tool schema; no free text, no SQL, no shell.
+- Zod validates envelope and every payload twice (parse + execute).
+- All writes go through existing typed handlers using the user's JWT → RLS enforced.
+- Org-scoped reference resolution prevents cross-tenant access.
+- Rate limiting from Lovable AI Gateway (429/402) is propagated unchanged.
+- Sequential execution avoids race conditions on shared lote counters.
+- Hard caps: max 20 operations per batch, max 4000 chars per note.
 
-- `crear_lote`: `cantidad_inicial = machos + hembras` if both given; require `fecha_nacimiento <= today`.
-- `registrar_mortalidad`: `cantidad <= lote.cantidad_actual`; if `caja` given, infer lote (error if multiple).
-- `trasladar_animales`: caja_destino must exist + belong to org; cantidad ≤ lote.cantidad_actual; emits `traslado_caja` event (existing trigger updates `caja_id`).
-- `dividir_lote`: sum of movimientos ≤ lote.cantidad_actual; creates new child lotes with `lote_padre_id`, then emits ajuste/traslado events.
-- All handlers: scope every query with `organization_id = orgId`. Even though RLS protects this, defense-in-depth.
+## Ambiguity handling
 
----
+- System prompt instructs the LLM to include uncertain items with `confidence < 0.6` rather than guess.
+- Low-confidence cards render with an amber warning and are unchecked by default.
+- Operations missing a required ref (e.g. an unknown caja code) become `invalid[]` from per-op zod or from ref resolution at execute time, with the offending field highlighted.
 
-## 7. Extensibility Strategy
+## Auditability
 
-Adding a new intent = 3 steps, no architectural change:
-1. Add schema entry in `schemas.ts`.
-2. Add handler file in `handlers/`.
-3. Register in dispatch map + add 1-2 examples to system prompt.
+`ai_journal_runs` stores: original note, validated operations, invalid ops, execution results, timestamps, user, org. Combined with the existing `lote_eventos` audit trail this gives full traceability: "what did the user paste" → "what did the AI extract" → "what was executed and what failed".
 
-The LLM call, validation pipeline, preview UI, and confirmation flow stay identical. New domains (ventas, gastos, alertas) plug in the same way.
-
----
-
-## 8. What's intentionally NOT in this version
-
-- ❌ No LangChain, no agents, no tool loops.
-- ❌ No vector DB / RAG (context is small enumerated lists).
-- ❌ No streaming (parse + execute are short request/response).
-- ❌ No autonomous execution — every mutation requires explicit user click.
-- ❌ No schema migrations.
-
----
-
-## 9. Safest Next AI Capability (post-MVP)
-
-**Read-only "explain" intents**: `resumen_lote`, `proyeccion_stock`, `estado_caja`. Same pipeline, same schema validator, but handlers only `select` — zero write risk, immediate user value, and exercises the same intent infrastructure. After that, batch operations (`registrar_mortalidad_masiva`) become natural since the architecture already supports arrays.
-
----
-
-## 10. Files to be Created / Edited
+## Files
 
 **Created**
-- `supabase/functions/ai-command/index.ts`
-- `supabase/functions/ai-command/prompt.ts`
-- `supabase/functions/ai-command/schemas.ts`
-- `supabase/functions/ai-command/resolve.ts`
-- `supabase/functions/ai-command/handlers/{lineas,cajas,lotes,mortalidad,traslados,division}.ts`
-- `src/data/aiCommand.ts`
-- `src/components/ai/AICommandBar.tsx`
-- `src/components/ai/AIResultPreview.tsx`
-- `src/components/ai/AIConfirmationDialog.tsx`
+- `src/components/ai/AIOperationCard.tsx`
+- `src/components/ai/AIOperationBatchPreview.tsx`
+- `src/components/ai/AIValidationWarnings.tsx`
+- `supabase/migrations/<ts>_ai_journal_runs.sql` (new audit table + RLS)
 
 **Edited**
-- `src/components/AppLayout.tsx` — mount command bar + keyboard shortcut.
+- `supabase/functions/ai-command/index.ts` (batch tool, `parse` returns batch, new `execute_batch`)
+- `supabase/functions/ai-command/schemas.ts` (operation + batch envelope, `validateOperation`)
+- `supabase/functions/ai-command/prompt.ts` (multi-operation extraction rules)
+- `src/data/aiCommand.ts` (batch types + helpers)
+- `src/components/ai/AICommandBar.tsx` (textarea, batch preview wiring)
 
-No DB migrations. No schema changes. Existing RLS + triggers do the heavy lifting.
+**Untouched**
+- All existing handlers in `supabase/functions/ai-command/handlers/*`
+- `resolve.ts`
+- All existing intent schemas
+- `AIResultPreview.tsx` and `AIConfirmationDialog.tsx` (kept for compatibility)
+
+## Future scalability
+
+- Per-intent grouping in the UI ("3 cajas, 2 nacimientos, 1 línea") becomes trivial because operations are typed.
+- Read-only "explain" intents (`resumen_lote`, `proyeccion_stock`) plug into the same batch pipeline as side-effect-free ops.
+- Dependency hints (`depends_on: ["tmp-1"]`) can be added to the operation schema later without breaking clients.
+- Streaming progress (per-op WebSocket / SSE) is a future drop-in on top of the same sequential executor.
+- Replay / undo can be built later from `ai_journal_runs` since the original note + extracted ops are stored.
