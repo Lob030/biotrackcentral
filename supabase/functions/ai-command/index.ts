@@ -227,14 +227,22 @@ async function actionExecuteBatch(req: Request) {
   const { sb, orgId, userId } = await authedClient(req);
   const body = await req.json().catch(() => ({}));
   const note = typeof body?.note === "string" ? body.note.slice(0, 4000) : "";
-  const ops: unknown[] = Array.isArray(body?.operations) ? body.operations : [];
-  if (ops.length === 0) return json({ error: "Sin operaciones" }, 400);
-  if (ops.length > 20) return json({ error: "Demasiadas operaciones (máx 20)" }, 400);
+  const rawOps: unknown[] = Array.isArray(body?.operations) ? body.operations : [];
+  if (rawOps.length === 0) return json({ error: "Sin operaciones" }, 400);
+  if (rawOps.length > 20) return json({ error: "Demasiadas operaciones (máx 20)" }, 400);
+
+  // Defensive normalization: tolerate stringified ops, data→payload, etc.
+  const { normalized, rejected } = normalizeOperations(rawOps);
+  const ops: unknown[] = normalized;
 
   const results: Array<
     | { id: string; intent: string; status: "ok"; summary: string; affected: Record<string, unknown> }
     | { id: string; intent?: string; status: "error"; error: string }
   > = [];
+
+  rejected.forEach((r) => {
+    results.push({ id: `tmp-${r.index + 1}`, status: "error", error: r.reason });
+  });
 
   for (const raw of ops) {
     const validated = validateOperation(raw);
