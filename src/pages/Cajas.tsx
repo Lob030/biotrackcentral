@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, MapPin, Pencil, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { clearErrorsOnDialogClose, optionalTrimmedString, requiredTrimmedString, toNullIfBlank } from "@/lib/form-utils";
 import { cn } from "@/lib/utils";
 import { useCajasList, useUpsertCaja, useDeleteCaja } from "@/data/cajas";
 import type { CajaRow } from "@/lib/types";
@@ -19,12 +20,13 @@ import { CardGridSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useSessionState } from "@/hooks/useSessionState";
 
 type Caja = CajaRow;
 
 const cajaFormSchema = z.object({
-  codigo: z.string().trim().min(1, "El código es obligatorio"),
-  ubicacion: z.string().optional(),
+  codigo: requiredTrimmedString("El codigo es obligatorio"),
+  ubicacion: optionalTrimmedString(),
   capacidad: z
     .string()
     .trim()
@@ -32,7 +34,7 @@ const cajaFormSchema = z.object({
     .refine((v) => v === "" || Number(v) >= 0, "Capacidad no puede ser negativa"),
   uso: z.enum(["reproductor", "engorda"]),
   estado: z.enum(["libre", "ocupada", "limpieza"]),
-  notas: z.string().optional(),
+  notas: optionalTrimmedString(),
 });
 
 type CajaFormValues = z.infer<typeof cajaFormSchema>;
@@ -46,10 +48,16 @@ const ESTADO_COLORS = {
 export default function Cajas() {
   const { profile } = useAuth();
   const confirm = useConfirm();
-  const [filterUso, setFilterUso] = useState("all");
-  const [filterEstado, setFilterEstado] = useState("all");
+  const [filterUso, setFilterUso] = useSessionState("cajas.filterUso", "all");
+  const [filterEstado, setFilterEstado] = useSessionState("cajas.filterEstado", "all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Caja | null>(null);
+  const codigoRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => codigoRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [open]);
 
   const form = useForm<CajaFormValues>({
     resolver: zodResolver(cajaFormSchema),
@@ -90,11 +98,11 @@ export default function Cajas() {
       id: editing?.id,
       payload: {
         codigo: values.codigo.trim(),
-        ubicacion: values.ubicacion?.trim() ? values.ubicacion.trim() : null,
+        ubicacion: toNullIfBlank(values.ubicacion),
         capacidad: values.capacidad ? Number(values.capacidad) : null,
         uso: values.uso,
         estado: values.estado,
-        notas: values.notas?.trim() ? values.notas.trim() : null,
+        notas: toNullIfBlank(values.notas),
         organization_id: profile.organization_id,
       },
     });
@@ -225,14 +233,14 @@ export default function Cajas() {
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) form.clearErrors(); }}>
+      <Dialog open={open} onOpenChange={(next) => clearErrorsOnDialogClose(next, setOpen, form)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader><DialogTitle className="display-font">{editing ? "Editar caja" : "Nueva caja"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+          <form className="space-y-4" onSubmit={form.handleSubmit(submit)}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Código *</Label>
-                <Input value={form.watch("codigo")} onChange={(e) => form.setValue("codigo", e.target.value, { shouldValidate: true })} placeholder="Ej: R-01" />
+                <Input ref={codigoRef} value={form.watch("codigo")} onChange={(e) => form.setValue("codigo", e.target.value, { shouldValidate: true })} placeholder="Ej: R-01" />
                 {form.formState.errors.codigo && <p className="text-xs text-destructive">{form.formState.errors.codigo.message}</p>}
               </div>
               <div className="space-y-2">
@@ -274,11 +282,11 @@ export default function Cajas() {
               <Label>Notas</Label>
               <Textarea value={form.watch("notas") ?? ""} onChange={(e) => form.setValue("notas", e.target.value, { shouldValidate: true })} rows={2} />
             </div>
-          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={form.handleSubmit(submit)} disabled={upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear caja"}</Button>
+            <Button type="submit" disabled={upsert.isPending} className="bg-gradient-primary text-primary-foreground hover:opacity-90">{editing ? "Guardar" : "Crear caja"}</Button>
           </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
