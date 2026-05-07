@@ -65,3 +65,61 @@ Deno.test("guards against array as operation", () => {
   assertEquals(normalized.length, 0);
   assertEquals(rejected.length, 1);
 });
+
+Deno.test("stringified payload is parsed into object", () => {
+  const op = { id: "tmp-1", intent: "crear_caja", payload: JSON.stringify({ codigos: ["A1"], uso: "engorda" }) };
+  const { normalized, logs } = normalizeOperations([op]);
+  assertEquals(normalized.length, 1);
+  assert(typeof normalized[0].payload === "object" && normalized[0].payload !== null);
+  assertEquals((normalized[0].payload as any).uso, "engorda");
+  assert(logs.some((l) => l.action === "parsed_payload_string"));
+});
+
+Deno.test("malformed payload string is left untouched and logged", () => {
+  const op = { id: "tmp-1", intent: "crear_caja", payload: "{ not: valid json" };
+  const { normalized, logs } = normalizeOperations([op]);
+  assertEquals(normalized.length, 1);
+  assertEquals(typeof normalized[0].payload, "string");
+  assert(logs.some((l) => l.action === "invalid_payload_string"));
+});
+
+Deno.test("non-JSON-looking payload string is logged but not parsed", () => {
+  const op = { id: "tmp-1", intent: "crear_caja", payload: "engorda" };
+  const { normalized, logs } = normalizeOperations([op]);
+  assertEquals(normalized[0].payload, "engorda");
+  assert(logs.some((l) => l.action === "invalid_payload_string"));
+});
+
+Deno.test("payload string that parses to non-object is rejected (left as string)", () => {
+  const op = { id: "tmp-1", intent: "crear_caja", payload: "[1,2,3]" };
+  const { normalized, logs } = normalizeOperations([op]);
+  // Doesn't start with "{" so we don't even try to parse
+  assertEquals(typeof normalized[0].payload, "string");
+  assert(logs.some((l) => l.action === "invalid_payload_string"));
+});
+
+Deno.test("mixed batch: valid object payload, stringified payload, malformed payload", () => {
+  const ops = [
+    { id: "tmp-1", intent: "crear_caja", payload: { codigos: ["A1"] } },
+    { id: "tmp-2", intent: "crear_caja", payload: JSON.stringify({ codigos: ["B2"] }) },
+    { id: "tmp-3", intent: "crear_caja", payload: "{ broken" },
+  ];
+  const { normalized, logs } = normalizeOperations(ops);
+  assertEquals(normalized.length, 3);
+  assertEquals(typeof normalized[0].payload, "object");
+  assertEquals(typeof normalized[1].payload, "object");
+  assertEquals(typeof normalized[2].payload, "string");
+  assert(logs.some((l) => l.action === "parsed_payload_string"));
+  assert(logs.some((l) => l.action === "invalid_payload_string"));
+});
+
+Deno.test("nested stringified payload is NOT recursively re-parsed", () => {
+  // payload contains a stringified field inside; we only parse one level.
+  const inner = JSON.stringify({ nested: "value" });
+  const op = { id: "tmp-1", intent: "crear_caja", payload: JSON.stringify({ codigos: ["A1"], extra: inner }) };
+  const { normalized } = normalizeOperations([op]);
+  const p = normalized[0].payload as any;
+  assertEquals(typeof p, "object");
+  // extra remains a string (no recursive parsing)
+  assertEquals(typeof p.extra, "string");
+});
