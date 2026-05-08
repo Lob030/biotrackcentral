@@ -14,6 +14,7 @@ import AIOperationBatchPreview from "./AIOperationBatchPreview";
 import {
   executeBatch,
   parseBatch,
+  sendAITelemetry,
   type BatchParseResult,
   type OperationExecutionResult,
   type ParsedOperation,
