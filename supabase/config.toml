@@ -1,1 +1,54 @@
+# Supabase Configuration
+# This is the local development configuration
+# For staging and production, use separate Supabase projects
+
 project_id = "nuaujexiieyhplxoxalt"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost:54321"
+
+[inbucket]
+port = 54324
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = [
+  "http://localhost:5173",
+  "http://localhost:8080"
+]
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+
+[storage]
+enabled = true
+
+[functions]
+enabled = true
+
+[analytics]
+enabled = false
+
+# =====================================================
+# Environment-specific notes:
+# 
+# LOCAL: Use this config as-is for local development
+# STAGING: Create separate Supabase project, update project_id
+# PRODUCTION: Create separate Supabase project, update project_id
+#
+# Each environment MUST have its own Supabase project!
+# =====================================================

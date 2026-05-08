@@ -5,12 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "vite --mode local",
+    "dev:staging": "vite --mode staging",
+    "dev:production": "vite --mode production",
     "build": "vite build",
+    "build:local": "vite build --mode local",
+    "build:staging": "vite build --mode staging",
+    "build:production": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "preview:staging": "vite preview --mode staging",
+    "preview:production": "vite preview --mode production",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "migrate:check": "npx supabase db diff",
+    "migrate:generate": "npx supabase migration new",
+    "migrate:staging": "npx supabase db push --db-url $SUPABASE_STAGING_DB_URL",
+    "migrate:production": "npx supabase db push --db-url $SUPABASE_PRODUCTION_DB_URL"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
