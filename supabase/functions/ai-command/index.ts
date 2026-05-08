@@ -313,6 +313,36 @@ async function actionExecuteBatch(req: Request) {
   return json({ ok: true, results, summary: `${okCount} ejecutada(s), ${errCount} con error.` });
 }
 
+// Lightweight telemetry: best-effort insert into ai_telemetry_events.
+// Never affects user-facing flow; failures are swallowed and logged.
+async function actionTelemetry(req: Request) {
+  try {
+    const { sb, orgId, userId } = await authedClient(req);
+    const body = await req.json().catch(() => ({}));
+    const event_type = String(body?.event_type ?? "").trim().slice(0, 80);
+    if (!event_type) return json({ ok: true });
+    const duration_ms =
+      typeof body?.duration_ms === "number" && Number.isFinite(body.duration_ms)
+        ? Math.max(0, Math.min(3_600_000, Math.round(body.duration_ms)))
+        : null;
+    const metadata =
+      body?.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
+        ? body.metadata
+        : {};
+    await sb.from("ai_telemetry_events").insert({
+      organization_id: orgId,
+      user_id: userId,
+      event_type,
+      duration_ms,
+      metadata,
+    });
+    return json({ ok: true });
+  } catch (e) {
+    console.warn("telemetry insert failed", e);
+    return json({ ok: true }); // never fail the client
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -321,6 +351,7 @@ Deno.serve(async (req) => {
     if (action === "parse") return await actionParse(req);
     if (action === "execute") return await actionExecute(req);
     if (action === "execute_batch") return await actionExecuteBatch(req);
+    if (action === "telemetry") return await actionTelemetry(req);
     return json({ error: "Acción desconocida" }, 400);
   } catch (e) {
     if (e instanceof ZodError) {
