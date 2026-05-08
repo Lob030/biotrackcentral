@@ -1,9 +1,10 @@
-import { AlertTriangle, CheckCircle2, XCircle, Flame } from "lucide-react";
+import { AlertTriangle, CheckCircle2, XCircle, Flame, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DESTRUCTIVE_INTENTS,
   INTENT_LABELS,
+  isClarification,
   type OperationExecutionResult,
   type ParsedOperation,
 } from "@/data/aiCommand";
@@ -28,9 +29,55 @@ interface Props {
 }
 
 export default function AIOperationCard({ op, selected, onToggle, result, disabled }: Props) {
-  const lowConfidence = op.confidence < 0.6;
+  const clarification = isClarification(op.intent);
+  const lowConfidence = !clarification && op.confidence < 0.6;
   const destructive = DESTRUCTIVE_INTENTS.has(op.intent);
   const entries = Object.entries(op.payload);
+
+  // Clarification ops cannot be executed — they need human follow-up first.
+  const checkboxDisabled = disabled || !!result || clarification;
+
+  // ── Clarification rendering ──
+  if (clarification) {
+    const reason = (op.payload as any)?.razon ?? (op.payload as any)?.reason;
+    const missing = ((op.payload as any)?.missing_fields ?? []) as string[];
+    const ambiguous = ((op.payload as any)?.ambiguous_references ?? []) as string[];
+    const suggestions = ((op.payload as any)?.suggestions ?? []) as string[];
+    return (
+      <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300 gap-1">
+            <HelpCircle className="h-3 w-3" />
+            {INTENT_LABELS[op.intent] ?? op.intent}
+          </Badge>
+          <span className="text-[11px] text-muted-foreground">no se ejecutará</span>
+        </div>
+        {op.source_text && (
+          <p className="text-xs italic text-muted-foreground line-clamp-2">"{op.source_text}"</p>
+        )}
+        {reason && (
+          <p className="text-sm text-amber-800 dark:text-amber-200">{reason}</p>
+        )}
+        {missing.length > 0 && (
+          <div className="text-xs">
+            <span className="font-semibold text-muted-foreground">Faltan: </span>
+            {missing.join(", ")}
+          </div>
+        )}
+        {ambiguous.length > 0 && (
+          <div className="text-xs">
+            <span className="font-semibold text-muted-foreground">Ambiguo: </span>
+            {ambiguous.join(", ")}
+          </div>
+        )}
+        {suggestions.length > 0 && (
+          <ul className="text-xs list-disc pl-5 space-y-0.5 text-muted-foreground">
+            {suggestions.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -47,7 +94,7 @@ export default function AIOperationCard({ op, selected, onToggle, result, disabl
       <div className="flex items-start gap-3 p-3">
         <Checkbox
           checked={selected}
-          disabled={disabled || !!result}
+          disabled={checkboxDisabled}
           onCheckedChange={(v) => onToggle(op.id, v === true)}
           className="mt-1"
         />

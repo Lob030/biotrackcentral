@@ -1,167 +1,108 @@
-# Multi-Operation AI Copilot — Operational Journal Parser
+## Current state
 
-## Goal
+The base operational copilot already exists and works end-to-end:
 
-Upgrade the Copilot from "one command → one intent" to "one operational note → N validated intents", reviewed and executed as a batch, while preserving the existing parse/execute separation, RLS, typed handlers, zod validation and audit logs.
+- Edge function `supabase/functions/ai-command/` with `parse` / `execute` / `execute_batch` actions
+- Typed Zod schemas + per-intent handlers (lineas, cajas, lotes, mortalidad, traslados, division)
+- `normalizeOperations()` with stringified-payload, `data→payload`, id-dedup hardening + tests
+- Frontend: `AICommandBar`, `AIOperationBatchPreview`, `AIOperationCard`, `AIValidationWarnings`, `AIConfirmationDialog`, `AIResultPreview`
+- Audit table `ai_journal_runs` (RLS, org-scoped)
+- Pending migration file `20260507200000_ai_aliases.sql` exists but is **not yet applied**
+- Missing entirely: telemetry table, clarification UI, voice hook, proactive suggestions, macros, analytics page, env separation
 
-## Architecture overview
+The request is enterprise-wide. To stay deterministic, auditable, and avoid overengineering, I propose **5 phases** delivered in this order. Each phase preserves the existing parse → normalize → validate → preview → confirm → execute pipeline. Nothing autonomous, nothing recursive.
 
-```text
- ┌──────────────┐       ┌─────────────────────┐      ┌────────────────────┐
- │ user note    │──────▶│ /ai-command?action= │─────▶│ LLM (tool calling) │
- │ (free text)  │       │   parse             │      │  → operations[]    │
- └──────────────┘       └──────────┬──────────┘      └──────────┬─────────┘
-                                   │ zod validate per op        │
-                                   ▼                            │
-                        ┌──────────────────────┐                │
-                        │ batch envelope:      │◀───────────────┘
-                        │  valid[] + invalid[] │
-                        └──────────┬───────────┘
-                                   ▼
-                       ┌──────────────────────┐
-                       │ AIOperationBatch     │  user reviews,
-                       │ Preview (cards)      │  toggles, edits selection
-                       └──────────┬───────────┘
-                                  ▼
-                       ┌──────────────────────┐
-                       │ /ai-command?action=  │  sequential, per-op
-                       │   execute_batch      │  re-validation + handler
-                       └──────────────────────┘
-```
+---
 
-The LLM still produces only structured JSON via tool calling. It never touches the DB, never emits SQL, never performs autonomous execution. Each operation is independently validated, previewed, and explicitly approved by the user before any handler runs.
+## Phase 1 — Foundations (DB + clarification + aliases)
 
-## What changes vs current
+**Migrations**
+- Apply existing `ai_aliases` migration (idempotent — uses `IF NOT EXISTS`)
+- Add `ai_telemetry_events` table: `id, organization_id, user_id, event_type text, duration_ms int, metadata jsonb, created_at` + org-scoped RLS (insert by self, select by org)
 
-- `parse` returns a **batch** of operations (1..N) instead of a single intent. Single-intent UI keeps working — a 1-op batch renders as a single card.
-- A new `execute_batch` action runs operations sequentially; each op is re-validated server-side with the same zod schema and dispatched to the existing typed handler. Per-op success/failure is captured.
-- New UI: a batch preview with one card per operation, toggles to include/exclude, and clear error messages for invalid operations. Partial execution is the default.
-- New audit log table `ai_journal_runs` records the original note, extracted operations, and per-op execution results.
+**Edge function**
+- Add `requires_clarification` intent in `schemas.ts` with payload `{ reason, missing_fields[], suggestions[] }`
+- Update `prompt.ts`: when fields are ambiguous, model MUST emit `requires_clarification` instead of guessing
+- Inject org aliases into system prompt (load top N from `ai_aliases` at parse-time)
+- New `telemetry` action that inserts into `ai_telemetry_events`
 
-## Schema additions (zod)
+**Frontend**
+- `AIOperationCard`: render clarification ops with a distinct yellow style + disable execution toggle
+- `aiCommand.ts`: add `sendAITelemetry()` (already half-stubbed)
+- `pages/Admin.tsx` (or new tab): `AIAliasesManager.tsx` — CRUD list of aliases scoped to the user's org
 
-In `supabase/functions/ai-command/schemas.ts`:
+---
 
-- New `operationSchema` = current intent envelope + a string `id` (`tmp-1`, `tmp-2`, …) to correlate parse → execute.
-- New `batchEnvelopeSchema = z.object({ operations: z.array(operationSchema).min(1).max(20) })`.
-- `validateOperation(raw)` mirrors current `validateIntent` but returns `{ ok: true, op } | { ok: false, id, intent?, raw, error }` so invalid ops do not abort the batch.
+## Phase 2 — Voice copilot
 
-No existing intent schemas change. No DB schema changes for intents themselves.
+- New hook `src/hooks/useSpeechRecognition.ts` wrapping the Web Speech API behind a stable interface (so we can swap to Whisper later). Returns `{ isListening, transcript, start, stop, supported, error }`.
+- `AICommandBar`: mic button with pulse animation, 1s silence auto-stop fills the textarea (does NOT auto-submit). User still clicks "Analizar".
+- Telemetry: emit `voice_session_started` / `voice_session_committed` events.
 
-## Edge function changes (`supabase/functions/ai-command/index.ts`)
+---
 
-- `actionParse`:
-  - Same auth + org context loading.
-  - New tool definition `registrar_operaciones` whose `parameters` is `{ operations: [ oneOf <intent variants with id> ] }` with `min 1, max 20`.
-  - Updated system prompt: "Extract ALL operations present in the note as separate items. Preserve order. If a sentence is ambiguous, include it with confidence < 0.6. Never merge unrelated operations."
-  - After the LLM returns, validate the envelope, then validate each operation independently. Return:
-    ```json
-    {
-      "ok": true,
-      "operations": [ { "id", "intent", "confidence", "payload", "requires_confirmation": true } ],
-      "invalid":   [ { "id", "intent?", "error", "raw" } ]
-    }
-    ```
-- `actionExecuteBatch` (new, `?action=execute_batch`):
-  - Accepts `{ note?: string, operations: ValidatedOperation[] }`.
-  - Re-auths, re-validates each op with zod, then calls the existing `HANDLERS[intent]` sequentially.
-  - Captures `{ id, status: "ok" | "error", summary?, affected?, error? }` per op. One failing op does NOT abort the rest, but destructive ops that depend on a prior op's resolved ref simply fail their own ref-resolution step (handlers already throw `ResolveError`).
-  - Writes one row to `ai_journal_runs` with the original note, operations, and results.
-- Backward-compat: `actionExecute` (single op) is kept. Frontend single-shot flows still work.
+## Phase 3 — Proactive suggestions
 
-## Frontend changes
+- `src/lib/aiSuggestions.ts` — pure deterministic rule engine. Reads from existing TanStack queries (lotes, cajas) and emits typed `Suggestion[]`:
+  - `weaning_overdue` (lote nacimiento > N days, no destete event)
+  - `cage_overcrowded` (lote.cantidad_actual > caja.capacidad)
+  - `incomplete_workflow` (lote without caja / linea_genetica)
+- New `SuggestionsPanel.tsx` on Dashboard — each suggestion has a "Aplicar con copiloto" button that **fills `AICommandBar` with a synthetic prompt** and opens the standard preview flow. No direct execution.
 
-- `src/data/aiCommand.ts`:
-  - New types `BatchParseResult`, `ValidatedOperation`, `OperationExecutionResult`.
-  - New `parseBatch(text)` → calls `?action=parse` (now returns batch shape).
-  - New `executeBatch(note, operations)` → calls `?action=execute_batch`.
-  - Keep `parseCommand` / `executeCommand` as thin wrappers for compatibility.
+---
 
-- New components in `src/components/ai/`:
-  - `AIOperationCard.tsx` — single op card: intent label, confidence chip, payload table (reuses logic from current `AIResultPreview`), include/exclude toggle, low-confidence + destructive warnings, post-execution status badge (✓ ok / ✗ error + message).
-  - `AIValidationWarnings.tsx` — banner listing invalid operations from parse phase with reason and the original snippet.
-  - `AIOperationBatchPreview.tsx` — full preview dialog: header summary ("3 operaciones detectadas, 2 seleccionadas"), invalid warnings, scrollable list of `AIOperationCard`, footer with "Ejecutar 2 operaciones" / Cancel. Disables run when nothing selected. After execution, re-renders cards with their result statuses and offers a "Cerrar" button.
+## Phase 4 — Operational macros
 
-- `AICommandBar.tsx` updates:
-  - Switch input from `<Input />` to `<Textarea />` (auto-grow, multi-line) so users can paste journals.
-  - On submit, call `parseBatch`. Open `AIOperationBatchPreview` instead of `AIConfirmationDialog`.
-  - Examples list updated to include a multi-line journal example.
-  - Keep ⌘K shortcut and floating launcher.
-
-- `AIConfirmationDialog.tsx` is no longer the primary path but stays for any single-intent callers.
-
-## Database additions (audit)
-
-New table `ai_journal_runs` (only addition, no edits to existing tables):
-
-- `organization_id uuid`, `user_id uuid`, `note text`, `operations jsonb`, `results jsonb`, `created_at timestamptz default now()`.
-- RLS: select/insert restricted to `organization_id = get_user_org(auth.uid())` and `user_id = auth.uid()` for insert. No update, no delete.
-- Insert performed from the edge function under the user's JWT (RLS enforced).
-
-## Validation strategy
-
-1. **Envelope validation**: the LLM tool call must match `batchEnvelopeSchema` (1..20 ops). If not, return 422.
-2. **Per-operation validation**: each op runs through its existing intent zod schema. Failures become `invalid[]` entries with a human-readable error; they do NOT block the rest.
-3. **Re-validation on execute**: every op is re-parsed by zod on `execute_batch` so a tampered payload from the client is rejected.
-4. **Reference resolution**: handlers continue to resolve textual refs (`A1`, `C57-22`) inside the user's org via existing `resolve.ts`. Unknown refs surface as per-op errors.
-5. **Confidence**: ops with `confidence < 0.6` are marked low-confidence in the UI and pre-unchecked, forcing explicit user opt-in.
-
-## Partial execution handling
-
-- Server executes only the operations the client sends, in array order.
-- Each handler call is wrapped in try/catch; a thrown error becomes `{ status: "error", error: msg }` for that op only; the loop continues.
-- Response shape:
-  ```json
-  { "ok": true, "results": [ { "id": "tmp-1", "status": "ok", "summary": "...", "affected": {...} },
-                             { "id": "tmp-2", "status": "error", "error": "Caja A9 no existe" } ] }
+- Typed registry `supabase/functions/ai-command/macros.ts`:
+  ```ts
+  type Macro = {
+    id: 'weaning_protocol' | 'deep_cleaning';
+    params: ZodSchema;
+    expand: (params, ctx) => string; // returns synthetic NL prompt
+    maxOps: number;
+  };
   ```
-- UI replaces each card's footer with its result; user can re-open the bar and re-issue corrections for the failed ones.
+- Macros NEVER execute directly. `expand()` returns a natural-language prompt that goes through the existing parser → preview → confirm pipeline.
+- Frontend: `MacroPicker.tsx` dropdown next to `AICommandBar` with parameter form + dry-run preview.
+- Hard caps: `maxOps ≤ 20`, 30s timeout, conflict detection (refuse if same lote/caja appears in conflicting ops).
 
-## Safety boundaries (preserved)
+---
 
-- LLM output is constrained to the tool schema; no free text, no SQL, no shell.
-- Zod validates envelope and every payload twice (parse + execute).
-- All writes go through existing typed handlers using the user's JWT → RLS enforced.
-- Org-scoped reference resolution prevents cross-tenant access.
-- Rate limiting from Lovable AI Gateway (429/402) is propagated unchanged.
-- Sequential execution avoids race conditions on shared lote counters.
-- Hard caps: max 20 operations per batch, max 4000 chars per note.
+## Phase 5 — Analytics + environment separation
 
-## Ambiguity handling
+- `src/pages/CopilotAnalytics.tsx` — admin-only page reading `ai_telemetry_events` + `ai_journal_runs`:
+  - Clarification rate, abandon rate, parse-failure rate, avg confirm time, macro usage, manual-edit rate
+  - Recharts bar/line charts, all queries org-scoped via RLS
+- Environment separation:
+  - `.env.staging` / `.env.production` example files + docs in `docs/DEPLOYMENT.md`
+  - `package.json` scripts `build:staging`, `build:production` (Vite mode flags)
+  - Feature flags via `VITE_FEATURE_*` env vars (voice, macros, proactive can be toggled)
+  - Rollback notes (Lovable revert + Supabase migration down strategy)
 
-- System prompt instructs the LLM to include uncertain items with `confidence < 0.6` rather than guess.
-- Low-confidence cards render with an amber warning and are unchecked by default.
-- Operations missing a required ref (e.g. an unknown caja code) become `invalid[]` from per-op zod or from ref resolution at execute time, with the offending field highlighted.
+---
 
-## Auditability
+## Cross-cutting
 
-`ai_journal_runs` stores: original note, validated operations, invalid ops, execution results, timestamps, user, org. Combined with the existing `lote_eventos` audit trail this gives full traceability: "what did the user paste" → "what did the AI extract" → "what was executed and what failed".
+**Security**
+- All new tables: org-scoped RLS only, no role escalation paths, `created_by`/`user_id` immutable via insert-only `WITH CHECK (user_id = auth.uid())`.
+- Aliases & telemetry strictly org-isolated.
 
-## Files
+**Testing**
+- Extend `normalize_test.ts` with: clarification op passthrough, malformed payload regression, alias substitution.
+- New `macros_test.ts`, `clarification_test.ts` (Deno).
+- Frontend: 1 Vitest per new pure module (`aiSuggestions`, macro expand functions).
 
-**Created**
-- `src/components/ai/AIOperationCard.tsx`
-- `src/components/ai/AIOperationBatchPreview.tsx`
-- `src/components/ai/AIValidationWarnings.tsx`
-- `supabase/migrations/<ts>_ai_journal_runs.sql` (new audit table + RLS)
+**UX guardrails preserved**
+- No auto-execute anywhere
+- Voice → fills text, never submits
+- Suggestions → fill prompt, never submit
+- Macros → expand to prompt, go through preview
+- Clarification → blocks execution, requests human input
 
-**Edited**
-- `supabase/functions/ai-command/index.ts` (batch tool, `parse` returns batch, new `execute_batch`)
-- `supabase/functions/ai-command/schemas.ts` (operation + batch envelope, `validateOperation`)
-- `supabase/functions/ai-command/prompt.ts` (multi-operation extraction rules)
-- `src/data/aiCommand.ts` (batch types + helpers)
-- `src/components/ai/AICommandBar.tsx` (textarea, batch preview wiring)
+---
 
-**Untouched**
-- All existing handlers in `supabase/functions/ai-command/handlers/*`
-- `resolve.ts`
-- All existing intent schemas
-- `AIResultPreview.tsx` and `AIConfirmationDialog.tsx` (kept for compatibility)
+## Deliverable order in this build loop
 
-## Future scalability
+If you approve, I'll implement **Phase 1 fully** in this loop (highest leverage: unblocks aliases, clarification UI, telemetry), then ask before continuing to Phase 2–5. This keeps each loop reviewable and the diff focused.
 
-- Per-intent grouping in the UI ("3 cajas, 2 nacimientos, 1 línea") becomes trivial because operations are typed.
-- Read-only "explain" intents (`resumen_lote`, `proyeccion_stock`) plug into the same batch pipeline as side-effect-free ops.
-- Dependency hints (`depends_on: ["tmp-1"]`) can be added to the operation schema later without breaking clients.
-- Streaming progress (per-op WebSocket / SSE) is a future drop-in on top of the same sequential executor.
-- Replay / undo can be built later from `ai_journal_runs` since the original note + extracted ops are stored.
+**Question before I start:** Do you want all 5 phases implemented in this single loop, or Phase 1 first with subsequent phases gated on your review? Phase 1 alone is ~6 files + 1 migration; all 5 together is ~25 files + 2 migrations and a much larger surface to review.

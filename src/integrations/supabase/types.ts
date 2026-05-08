@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          entity_ref: string
+          entity_type: string
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          entity_ref: string
+          entity_type: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          entity_ref?: string
+          entity_type?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_aliases_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_journal_runs: {
         Row: {
           created_at: string
@@ -46,6 +84,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ai_telemetry_events: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          metadata: Json
+          organization_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          metadata?: Json
+          organization_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_telemetry_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       alertas_personalizadas: {
         Row: {

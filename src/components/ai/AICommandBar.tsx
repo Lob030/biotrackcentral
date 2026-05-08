@@ -14,6 +14,7 @@ import AIOperationBatchPreview from "./AIOperationBatchPreview";
 import {
   executeBatch,
   parseBatch,
+  sendAITelemetry,
   type BatchParseResult,
   type OperationExecutionResult,
   type ParsedOperation,
@@ -62,8 +63,16 @@ export default function AICommandBar() {
     const t = text.trim();
     if (!t || parsing) return;
     setParsing(true);
+    const t0 = performance.now();
     try {
       const parsed = await parseBatch(t);
+      const dur = Math.round(performance.now() - t0);
+      sendAITelemetry("parse_success", dur, {
+        ops: parsed.operations.length,
+        invalid: parsed.invalid.length,
+        clarifications: parsed.operations.filter((o) => o.intent === "requires_clarification").length,
+        text_len: t.length,
+      });
       if (parsed.operations.length === 0 && parsed.invalid.length === 0) {
         toast.error("No se detectaron operaciones en la nota.");
         return;
@@ -72,6 +81,9 @@ export default function AICommandBar() {
       setResults(null);
       setOpen(false);
     } catch (e: any) {
+      sendAITelemetry("parse_failed", Math.round(performance.now() - t0), {
+        error: String(e?.message ?? e).slice(0, 200),
+      });
       toast.error(e?.message ?? "No se pudo interpretar la nota");
     } finally {
       setParsing(false);
@@ -79,6 +91,11 @@ export default function AICommandBar() {
   };
 
   const cancel = () => {
+    if (batch && !results) {
+      sendAITelemetry("batch_abandoned", undefined, {
+        ops: batch.operations.length,
+      });
+    }
     setBatch(null);
     setResults(null);
     if (results) setText("");
@@ -87,11 +104,17 @@ export default function AICommandBar() {
   const confirm = async (selected: ParsedOperation[]) => {
     if (!batch || selected.length === 0) return;
     setExecuting(true);
+    const t0 = performance.now();
     try {
       const res = await executeBatch(batch.note, selected);
       setResults(res.results);
       const ok = res.results.filter((r) => r.status === "ok").length;
       const err = res.results.length - ok;
+      sendAITelemetry("batch_executed", Math.round(performance.now() - t0), {
+        selected: selected.length,
+        ok,
+        err,
+      });
       if (err === 0) toast.success(`${ok} operación(es) ejecutada(s).`);
       else if (ok === 0) toast.error(`Todas fallaron (${err}).`);
       else toast.warning(`${ok} ejecutada(s), ${err} con error.`);
@@ -100,6 +123,9 @@ export default function AICommandBar() {
       invalidateCajas(qc);
       qc.invalidateQueries({ queryKey: ["lineas_geneticas"] });
     } catch (e: any) {
+      sendAITelemetry("batch_failed", Math.round(performance.now() - t0), {
+        error: String(e?.message ?? e).slice(0, 200),
+      });
       toast.error(e?.message ?? "No se pudo ejecutar el lote");
     } finally {
       setExecuting(false);
