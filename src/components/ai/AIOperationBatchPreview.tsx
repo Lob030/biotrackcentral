@@ -32,11 +32,13 @@ export default function AIOperationBatchPreview({
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Default selection: include all ops with confidence >= 0.6.
+  // Default selection: include all ops with confidence >= 0.6,
+  // EXCEPT clarifications which can never be executed.
   useEffect(() => {
     if (!batch) return;
     const next = new Set<string>();
     batch.operations.forEach((op) => {
+      if (op.intent === "requires_clarification") return;
       if (op.confidence >= 0.6) next.add(op.id);
     });
     setSelected(next);
