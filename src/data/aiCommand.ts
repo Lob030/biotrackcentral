@@ -54,7 +54,10 @@ export interface BatchExecuteResult {
   summary: string;
 }
 
-async function call(action: "parse" | "execute" | "execute_batch", body: unknown) {
+async function call(
+  action: "parse" | "execute" | "execute_batch" | "telemetry",
+  body: unknown,
+) {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
   if (!token) throw new Error("Sesión expirada");
@@ -77,6 +80,19 @@ async function call(action: "parse" | "execute" | "execute_batch", body: unknown
 export const parseBatch = (text: string) => call("parse", { text }) as Promise<BatchParseResult>;
 export const executeBatch = (note: string, operations: ParsedOperation[]) =>
   call("execute_batch", { note, operations }) as Promise<BatchExecuteResult>;
+
+// Telemetry — fire-and-forget. Never throws.
+export const sendAITelemetry = (
+  event_type: string,
+  duration_ms?: number,
+  metadata?: Record<string, unknown>,
+) =>
+  call("telemetry", { event_type, duration_ms, metadata }).catch((e) => {
+    if (typeof console !== "undefined") console.debug("telemetry failed", e);
+  });
+
+export const CLARIFICATION_INTENT = "requires_clarification";
+export const isClarification = (intent: string) => intent === CLARIFICATION_INTENT;
 
 // Legacy wrappers (still supported by edge function)
 export const parseCommand = async (text: string): Promise<ParsedIntent> => {
