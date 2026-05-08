@@ -60,7 +60,7 @@ export default function AIOperationBatchPreview({
   const executed = !!results;
   const okCount = (results ?? []).filter((r) => r.status === "ok").length;
   const errCount = (results ?? []).length - okCount;
-  void (batch.operations.length - executableOps.length); // clarifications visible but non-executable
+  
 
   const toggle = (id: string, v: boolean) => {
     setSelected((prev) => {
