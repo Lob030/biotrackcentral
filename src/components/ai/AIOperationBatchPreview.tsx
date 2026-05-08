@@ -52,12 +52,15 @@ export default function AIOperationBatchPreview({
 
   if (!batch) return null;
 
-  const allIds = batch.operations.map((o) => o.id);
+  // Clarifications are excluded from selectable/executable set entirely.
+  const executableOps = batch.operations.filter((o) => o.intent !== "requires_clarification");
+  const allIds = executableOps.map((o) => o.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
-  const selectedOps = batch.operations.filter((o) => selected.has(o.id));
+  const selectedOps = executableOps.filter((o) => selected.has(o.id));
   const executed = !!results;
   const okCount = (results ?? []).filter((r) => r.status === "ok").length;
   const errCount = (results ?? []).length - okCount;
+  const clarificationCount = batch.operations.length - executableOps.length;
 
   const toggle = (id: string, v: boolean) => {
     setSelected((prev) => {
