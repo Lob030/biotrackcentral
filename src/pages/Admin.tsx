@@ -299,6 +299,8 @@ export default function Admin() {
           ))}
         </div>
       </section>
+
+      <AIAliasesManager />
     </div>
   );
 }
