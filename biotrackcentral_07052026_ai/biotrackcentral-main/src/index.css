@@ -1,0 +1,174 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Bioterio dark theme — laboratorio moderno con acentos cyan/teal */
+    --background: 222 35% 6%;
+    --background-soft: 222 30% 9%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 32% 9%;
+    --card-foreground: 210 40% 96%;
+    --card-elevated: 222 30% 11%;
+
+    --popover: 222 32% 8%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 187 92% 55%;
+    --primary-foreground: 222 47% 8%;
+    --primary-glow: 187 100% 70%;
+
+    --secondary: 222 25% 14%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 222 22% 13%;
+    --muted-foreground: 215 18% 60%;
+
+    --accent: 263 75% 65%;
+    --accent-foreground: 210 40% 98%;
+
+    --success: 152 70% 45%;
+    --success-foreground: 222 47% 8%;
+    --warning: 38 95% 58%;
+    --warning-foreground: 222 47% 8%;
+    --destructive: 0 78% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 25% 16%;
+    --input: 222 25% 14%;
+    --ring: 187 92% 55%;
+
+    --radius: 0.875rem;
+
+    /* Sidebar */
+    --sidebar-background: 222 38% 5%;
+    --sidebar-foreground: 215 20% 70%;
+    --sidebar-primary: 187 92% 55%;
+    --sidebar-primary-foreground: 222 47% 8%;
+    --sidebar-accent: 222 30% 10%;
+    --sidebar-accent-foreground: 187 92% 65%;
+    --sidebar-border: 222 25% 12%;
+    --sidebar-ring: 187 92% 55%;
+
+    /* Gradients & effects */
+    --gradient-primary: linear-gradient(135deg, hsl(187 92% 55%) 0%, hsl(200 95% 60%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(263 75% 65%) 0%, hsl(300 75% 65%) 100%);
+    --gradient-card: linear-gradient(160deg, hsl(222 32% 11%) 0%, hsl(222 32% 8%) 100%);
+    --gradient-glow: radial-gradient(circle at 50% 0%, hsl(187 92% 55% / 0.15), transparent 60%);
+
+    --shadow-glow: 0 0 40px hsl(187 92% 55% / 0.2);
+    --shadow-elevated: 0 8px 32px -8px hsl(222 60% 2% / 0.6);
+    --shadow-card: 0 1px 0 0 hsl(210 40% 96% / 0.04) inset, 0 8px 24px -12px hsl(222 60% 2% / 0.4);
+
+    --transition-smooth: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-image:
+      radial-gradient(circle at 0% 0%, hsl(187 92% 55% / 0.06), transparent 50%),
+      radial-gradient(circle at 100% 100%, hsl(263 75% 65% / 0.05), transparent 50%);
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: hsl(var(--background)); }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+    border: 2px solid hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted)); }
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-[var(--radius)] border border-border/60 bg-card/60 backdrop-blur-xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-card-elevated {
+    @apply rounded-[var(--radius)] border border-border/60;
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .stat-card {
+    @apply glass-card p-5 transition-all duration-300 hover:border-primary/40 hover:-translate-y-0.5;
+  }
+
+  .lift {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40;
+  }
+
+  .display-font {
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Page rhythm — consistent header block across pages */
+  .page-header {
+    @apply flex items-start justify-between mb-8 flex-wrap gap-4;
+  }
+  .page-title {
+    @apply display-font text-3xl md:text-4xl font-bold tracking-tight text-foreground;
+  }
+  .page-subtitle {
+    @apply text-sm text-muted-foreground mt-1.5;
+  }
+
+  /* Compact uppercase eyebrow label (Linear/Vercel-style) */
+  .eyebrow {
+    @apply text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground;
+  }
+
+  /* Section divider */
+  .hairline {
+    @apply border-t border-border/60;
+  }
+
+  /* Premium skeleton with shimmer overlay */
+  .skeleton-shimmer {
+    @apply relative overflow-hidden bg-muted/50 rounded-md;
+  }
+  .skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.05),
+      transparent
+    );
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Refined focus ring */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}

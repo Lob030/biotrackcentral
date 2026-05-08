@@ -7,6 +7,11 @@ export interface ParsedIntent {
   confidence: number;
   payload: Record<string, unknown>;
   requires_confirmation: boolean;
+  explanation?: {
+    understood: string;
+    entities_resolved?: string[];
+    assumptions_made?: string[];
+  };
 }
 export interface ExecuteResult {
   ok: true;
@@ -22,6 +27,11 @@ export interface ParsedOperation {
   payload: Record<string, unknown>;
   source_text?: string;
   requires_confirmation: true;
+  explanation?: {
+    understood: string;
+    entities_resolved?: string[];
+    assumptions_made?: string[];
+  };
 }
 export interface InvalidOperation {
   id: string;
@@ -79,6 +89,7 @@ export const parseCommand = async (text: string): Promise<ParsedIntent> => {
     confidence: first.confidence,
     payload: first.payload,
     requires_confirmation: true,
+    explanation: first.explanation,
   };
 };
 export const executeCommand = (intent: { intent: string; confidence: number; payload: Record<string, unknown> }) =>
@@ -94,6 +105,7 @@ export const INTENT_LABELS: Record<string, string> = {
   registrar_mortalidad: "Registrar mortalidad",
   trasladar_animales: "Trasladar animales",
   dividir_lote: "Dividir lote",
+  requires_clarification: "Falta Información (Aclaración requerida)",
 };
 
 export const DESTRUCTIVE_INTENTS = new Set([

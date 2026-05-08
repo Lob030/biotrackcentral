@@ -69,7 +69,7 @@ async function authedClient(req: Request) {
 }
 
 async function loadOrgContext(sb: SupabaseClient, orgId: string): Promise<OrgContext> {
-  const [lotes, cajas, lineas] = await Promise.all([
+  const [lotes, cajas, lineas, clientes, aliases, journals] = await Promise.all([
     sb.from("lotes")
       .select("codigo, especie, cantidad_actual")
       .eq("organization_id", orgId)
@@ -86,11 +86,28 @@ async function loadOrgContext(sb: SupabaseClient, orgId: string): Promise<OrgCon
       .eq("organization_id", orgId)
       .order("nombre", { ascending: true })
       .limit(40),
+    sb.from("clientes")
+      .select("nombre")
+      .eq("organization_id", orgId)
+      .eq("estado_cliente", "activo")
+      .limit(40),
+    sb.from("ai_aliases")
+      .select("alias, entity_type, entity_ref")
+      .eq("organization_id", orgId)
+      .limit(50),
+    sb.from("ai_journal_runs")
+      .select("note")
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
   return {
     lotes: (lotes.data ?? []).map((l: any) => ({ codigo: l.codigo ?? "", especie: l.especie, cantidad: l.cantidad_actual ?? 0 })),
     cajas: (cajas.data ?? []).map((c: any) => ({ codigo: c.codigo, uso: c.uso })),
     lineas: (lineas.data ?? []).map((l: any) => ({ nombre: l.nombre, especie: l.especie })),
+    clientes: (clientes.data ?? []).map((c: any) => ({ nombre: c.nombre })),
+    aliases: (aliases.data ?? []).map((a: any) => ({ alias: a.alias, type: a.entity_type, ref: a.entity_ref })),
+    recent_history: (journals.data ?? []).map((j: any) => j.note),
   };
 }
 
@@ -104,8 +121,17 @@ function buildBatchTool() {
       confidence: { type: "number" },
       payload: zodToJsonSchema(PAYLOAD_SCHEMAS[name as IntentName] as any, { target: "openApi3" }),
       source_text: { type: "string", description: "Fragmento literal de la nota" },
+      explanation: {
+        type: "object",
+        properties: {
+          understood: { type: "string", description: "Breve explicación de la operación detectada" },
+          entities_resolved: { type: "array", items: { type: "string" }, description: "Entidades clave que se emparejaron del contexto" },
+          assumptions_made: { type: "array", items: { type: "string" }, description: "Asunciones hechas al resolver la operación" },
+        },
+        required: ["understood"],
+      },
     },
-    required: ["id", "intent", "confidence", "payload"],
+    required: ["id", "intent", "confidence", "payload", "explanation"],
     additionalProperties: false,
   }));
 

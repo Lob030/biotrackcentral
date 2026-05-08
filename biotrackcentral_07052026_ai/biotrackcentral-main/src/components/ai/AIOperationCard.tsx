@@ -1,0 +1,111 @@
+import { AlertTriangle, CheckCircle2, XCircle, Flame } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DESTRUCTIVE_INTENTS,
+  INTENT_LABELS,
+  type OperationExecutionResult,
+  type ParsedOperation,
+} from "@/data/aiCommand";
+
+function renderValue(v: unknown): string {
+  if (v == null) return "—";
+  if (Array.isArray(v)) return v.map(renderValue).join(", ");
+  if (typeof v === "object") {
+    return Object.entries(v as Record<string, unknown>)
+      .map(([k, val]) => `${k}: ${renderValue(val)}`)
+      .join(" · ");
+  }
+  return String(v);
+}
+
+interface Props {
+  op: ParsedOperation;
+  selected: boolean;
+  onToggle: (id: string, value: boolean) => void;
+  result?: OperationExecutionResult;
+  disabled?: boolean;
+}
+
+export default function AIOperationCard({ op, selected, onToggle, result, disabled }: Props) {
+  const lowConfidence = op.confidence < 0.6;
+  const destructive = DESTRUCTIVE_INTENTS.has(op.intent);
+  const entries = Object.entries(op.payload);
+
+  return (
+    <div
+      className={`rounded-xl border bg-card transition-colors ${
+        result?.status === "ok"
+          ? "border-emerald-500/40"
+          : result?.status === "error"
+          ? "border-destructive/50"
+          : selected
+          ? "border-primary/40"
+          : "border-border/60"
+      }`}
+    >
+      <div className="flex items-start gap-3 p-3">
+        <Checkbox
+          checked={selected}
+          disabled={disabled || !!result}
+          onCheckedChange={(v) => onToggle(op.id, v === true)}
+          className="mt-1"
+        />
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="default" className="bg-gradient-primary text-primary-foreground">
+              {INTENT_LABELS[op.intent] ?? op.intent}
+            </Badge>
+            <Badge variant="outline" className="text-[11px]">
+              {(op.confidence * 100).toFixed(0)}%
+            </Badge>
+            {destructive && (
+              <Badge variant="outline" className="text-[11px] border-destructive/40 text-destructive gap-1">
+                <Flame className="h-3 w-3" /> sensible
+              </Badge>
+            )}
+            {lowConfidence && (
+              <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-600 gap-1">
+                <AlertTriangle className="h-3 w-3" /> baja confianza
+              </Badge>
+            )}
+          </div>
+
+          {op.source_text && (
+            <p className="text-xs italic text-muted-foreground line-clamp-2">"{op.source_text}"</p>
+          )}
+
+          <div className="rounded-lg border border-border/50 bg-muted/20 divide-y divide-border/40">
+            {entries.length === 0 ? (
+              <p className="p-2 text-xs text-muted-foreground">Sin datos.</p>
+            ) : (
+              entries.map(([k, v]) => (
+                <div key={k} className="grid grid-cols-[110px_1fr] gap-3 p-2 text-xs">
+                  <span className="font-medium text-muted-foreground uppercase tracking-wide">{k}</span>
+                  <span className="text-foreground tabular-nums break-words">{renderValue(v)}</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {result && (
+            <div
+              className={`flex items-start gap-2 rounded-lg p-2 text-xs ${
+                result.status === "ok"
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                  : "bg-destructive/10 text-destructive"
+              }`}
+            >
+              {result.status === "ok" ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+              ) : (
+                <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              )}
+              <span>{result.status === "ok" ? result.summary : result.error}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

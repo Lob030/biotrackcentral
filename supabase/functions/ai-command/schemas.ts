@@ -97,6 +97,13 @@ export const dividirLoteSchema = z.object({
   })).min(1).max(20),
 });
 
+export const clarificationSchema = z.object({
+  razon: z.string().trim().max(300),
+  missing_fields: z.array(z.string()).optional(),
+  suggestions: z.array(z.string()).optional(),
+  ambiguous_references: z.array(z.string()).optional(),
+});
+
 export const INTENT_NAMES = [
   "crear_linea_genetica",
   "editar_linea_genetica",
@@ -107,6 +114,7 @@ export const INTENT_NAMES = [
   "registrar_mortalidad",
   "trasladar_animales",
   "dividir_lote",
+  "requires_clarification",
 ] as const;
 export type IntentName = (typeof INTENT_NAMES)[number];
 
@@ -120,6 +128,7 @@ export const PAYLOAD_SCHEMAS = {
   registrar_mortalidad: mortalidadSchema,
   trasladar_animales: trasladoSchema,
   dividir_lote: dividirLoteSchema,
+  requires_clarification: clarificationSchema,
 } as const;
 
 export const intentEnvelopeSchema = z.object({
@@ -137,12 +146,19 @@ export function validateIntent(raw: unknown) {
 
 // ───────────── Multi-operation (batch) schemas ─────────────
 
+export const explanationSchema = z.object({
+  understood: z.string(),
+  entities_resolved: z.array(z.string()).optional(),
+  assumptions_made: z.array(z.string()).optional(),
+});
+
 export const operationEnvelopeSchema = z.object({
   id: z.string().trim().min(1).max(40),
   intent: z.enum(INTENT_NAMES),
   confidence: z.number().min(0).max(1).default(0.5),
   payload: z.record(z.unknown()),
   source_text: z.string().max(800).optional(),
+  explanation: explanationSchema.optional(),
 });
 
 export const batchEnvelopeSchema = z.object({
@@ -229,4 +245,5 @@ export type ValidatedIntent =
   | { intent: "editar_lote"; confidence: number; payload: z.infer<typeof editarLoteSchema> }
   | { intent: "registrar_mortalidad"; confidence: number; payload: z.infer<typeof mortalidadSchema> }
   | { intent: "trasladar_animales"; confidence: number; payload: z.infer<typeof trasladoSchema> }
-  | { intent: "dividir_lote"; confidence: number; payload: z.infer<typeof dividirLoteSchema> };
+  | { intent: "dividir_lote"; confidence: number; payload: z.infer<typeof dividirLoteSchema> }
+  | { intent: "requires_clarification"; confidence: number; payload: z.infer<typeof clarificationSchema> };
