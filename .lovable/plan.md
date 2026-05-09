@@ -1,108 +1,112 @@
-## Current state
+## Goal
 
-The base operational copilot already exists and works end-to-end:
+Constrain the AI Copilot to a **worker-level role** with strict module scope, and enforce a **plan-first, human-approved** execution model across the entire pipeline (parser → preview → execute).
 
-- Edge function `supabase/functions/ai-command/` with `parse` / `execute` / `execute_batch` actions
-- Typed Zod schemas + per-intent handlers (lineas, cajas, lotes, mortalidad, traslados, division)
-- `normalizeOperations()` with stringified-payload, `data→payload`, id-dedup hardening + tests
-- Frontend: `AICommandBar`, `AIOperationBatchPreview`, `AIOperationCard`, `AIValidationWarnings`, `AIConfirmationDialog`, `AIResultPreview`
-- Audit table `ai_journal_runs` (RLS, org-scoped)
-- Pending migration file `20260507200000_ai_aliases.sql` exists but is **not yet applied**
-- Missing entirely: telemetry table, clarification UI, voice hook, proactive suggestions, macros, analytics page, env separation
-
-The request is enterprise-wide. To stay deterministic, auditable, and avoid overengineering, I propose **5 phases** delivered in this order. Each phase preserves the existing parse → normalize → validate → preview → confirm → execute pipeline. Nothing autonomous, nothing recursive.
+The current architecture already has parse/execute separation and a preview dialog, but it does NOT enforce module scope at the schema/handler level, and the preview is not framed as an "Operational Plan". This plan closes both gaps.
 
 ---
 
-## Phase 1 — Foundations (DB + clarification + aliases)
+## 1. Define & enforce the allowed module scope
 
-**Migrations**
-- Apply existing `ai_aliases` migration (idempotent — uses `IF NOT EXISTS`)
-- Add `ai_telemetry_events` table: `id, organization_id, user_id, event_type text, duration_ms int, metadata jsonb, created_at` + org-scoped RLS (insert by self, select by org)
+**Allowed intents (worker scope):**
+- `crear_linea_genetica`, `editar_linea_genetica`
+- `crear_caja`, `editar_caja`
+- `crear_lote`, `editar_lote`, `registrar_mortalidad`, `trasladar_animales`, `dividir_lote`
+- `crear_cliente`, `editar_cliente` *(new — currently missing)*
+- `crear_pedido`, `editar_pedido` *(new — currently missing)*
+- `requires_clarification`
 
-**Edge function**
-- Add `requires_clarification` intent in `schemas.ts` with payload `{ reason, missing_fields[], suggestions[] }`
-- Update `prompt.ts`: when fields are ambiguous, model MUST emit `requires_clarification` instead of guessing
-- Inject org aliases into system prompt (load top N from `ai_aliases` at parse-time)
-- New `telemetry` action that inserts into `ai_telemetry_events`
+**Forbidden** (must never appear in any code path, prompt, or handler): organization settings, user roles, billing/plan, telemetry admin, alertas config, gastos, analytics, system controls.
 
-**Frontend**
-- `AIOperationCard`: render clarification ops with a distinct yellow style + disable execution toggle
-- `aiCommand.ts`: add `sendAITelemetry()` (already half-stubbed)
-- `pages/Admin.tsx` (or new tab): `AIAliasesManager.tsx` — CRUD list of aliases scoped to the user's org
-
----
-
-## Phase 2 — Voice copilot
-
-- New hook `src/hooks/useSpeechRecognition.ts` wrapping the Web Speech API behind a stable interface (so we can swap to Whisper later). Returns `{ isListening, transcript, start, stop, supported, error }`.
-- `AICommandBar`: mic button with pulse animation, 1s silence auto-stop fills the textarea (does NOT auto-submit). User still clicks "Analizar".
-- Telemetry: emit `voice_session_started` / `voice_session_committed` events.
+**Where this is enforced:**
+1. `supabase/functions/ai-command/schemas.ts` — `INTENT_NAMES` becomes the single source of truth; any intent outside the list is rejected by zod into `invalid[]`.
+2. `supabase/functions/ai-command/index.ts` — handler dispatcher uses an explicit allow-list map; unknown intent → typed error, never executed.
+3. `supabase/functions/ai-command/prompt.ts` — system prompt explicitly states the AI is a *worker*, lists allowed modules, and forbids admin/config/billing/analytics actions.
+4. Frontend `INTENT_LABELS` + `DESTRUCTIVE_INTENTS` updated to match.
 
 ---
 
-## Phase 3 — Proactive suggestions
+## 2. Add the two missing operational modules (Clients & Orders)
 
-- `src/lib/aiSuggestions.ts` — pure deterministic rule engine. Reads from existing TanStack queries (lotes, cajas) and emits typed `Suggestion[]`:
-  - `weaning_overdue` (lote nacimiento > N days, no destete event)
-  - `cage_overcrowded` (lote.cantidad_actual > caja.capacidad)
-  - `incomplete_workflow` (lote without caja / linea_genetica)
-- New `SuggestionsPanel.tsx` on Dashboard — each suggestion has a "Aplicar con copiloto" button that **fills `AICommandBar` with a synthetic prompt** and opens the standard preview flow. No direct execution.
+New zod schemas + edge handlers:
+- `handlers/clientes.ts` — create/edit client (name, contact, type, notes; org-scoped via RLS).
+- `handlers/pedidos.ts` — create/edit order header + line items (client ref, species, stage, quantity, unit price). Resolution layer matches client by name/alias.
 
----
-
-## Phase 4 — Operational macros
-
-- Typed registry `supabase/functions/ai-command/macros.ts`:
-  ```ts
-  type Macro = {
-    id: 'weaning_protocol' | 'deep_cleaning';
-    params: ZodSchema;
-    expand: (params, ctx) => string; // returns synthetic NL prompt
-    maxOps: number;
-  };
-  ```
-- Macros NEVER execute directly. `expand()` returns a natural-language prompt that goes through the existing parser → preview → confirm pipeline.
-- Frontend: `MacroPicker.tsx` dropdown next to `AICommandBar` with parameter form + dry-run preview.
-- Hard caps: `maxOps ≤ 20`, 30s timeout, conflict detection (refuse if same lote/caja appears in conflicting ops).
+Both go through the same parse → preview → confirm flow as existing handlers. No new tables — uses existing `clientes`, `pedidos`, `pedidos_detalles`.
 
 ---
 
-## Phase 5 — Analytics + environment separation
+## 3. Reframe the preview as an "Operational Plan"
 
-- `src/pages/CopilotAnalytics.tsx` — admin-only page reading `ai_telemetry_events` + `ai_journal_runs`:
-  - Clarification rate, abandon rate, parse-failure rate, avg confirm time, macro usage, manual-edit rate
-  - Recharts bar/line charts, all queries org-scoped via RLS
-- Environment separation:
-  - `.env.staging` / `.env.production` example files + docs in `docs/DEPLOYMENT.md`
-  - `package.json` scripts `build:staging`, `build:production` (Vite mode flags)
-  - Feature flags via `VITE_FEATURE_*` env vars (voice, macros, proactive can be toggled)
-  - Rollback notes (Lovable revert + Supabase migration down strategy)
+Rename the preview UX language (no logic change to execution gating, which is already correct):
 
----
-
-## Cross-cutting
-
-**Security**
-- All new tables: org-scoped RLS only, no role escalation paths, `created_by`/`user_id` immutable via insert-only `WITH CHECK (user_id = auth.uid())`.
-- Aliases & telemetry strictly org-isolated.
-
-**Testing**
-- Extend `normalize_test.ts` with: clarification op passthrough, malformed payload regression, alias substitution.
-- New `macros_test.ts`, `clarification_test.ts` (Deno).
-- Frontend: 1 Vitest per new pure module (`aiSuggestions`, macro expand functions).
-
-**UX guardrails preserved**
-- No auto-execute anywhere
-- Voice → fills text, never submits
-- Suggestions → fill prompt, never submit
-- Macros → expand to prompt, go through preview
-- Clarification → blocks execution, requests human input
+- `AIOperationBatchPreview.tsx` title: **"Plan Operacional Detectado"** instead of "Operaciones detectadas".
+- Each `AIOperationCard` shows three labeled sections:
+  - **✓ Lo que voy a hacer** (intent + payload summary)
+  - **🔍 Lo que entendí / asumí** (`explanation.understood`, `assumptions_made`, `entities_resolved`)
+  - **⚠ Información faltante** (only when `requires_clarification` or low confidence)
+- Group header summarizing total ops by module ("3 cajas, 1 nacimiento, 1 cliente").
+- Confirm button copy: **"Aprobar y ejecutar plan"**.
+- Reinforce in the dialog footer: *"Nada se ejecuta sin tu aprobación explícita."*
 
 ---
 
-## Deliverable order in this build loop
+## 4. Strengthen plan-first guarantees in the prompt
 
-If you approve, I'll implement **Phase 1 fully** in this loop (highest leverage: unblocks aliases, clarification UI, telemetry), then ask before continuing to Phase 2–5. This keeps each loop reviewable and the diff focused.
+Update `prompt.ts` with explicit rules:
+- "Eres un trabajador del bioterio, NO un administrador."
+- "Solo puedes operar sobre: líneas genéticas, cajas, lotes, clientes, pedidos."
+- "NUNCA ejecutas acciones — solo propones un plan que el humano debe aprobar."
+- "Prefiere `requires_clarification` ante cualquier ambigüedad real, pero infiere contexto razonable cuando sea obvio (ej. especie del lote padre, caja vacía implícita)."
+- Few-shot examples matching the user's samples ("Hoy nacieron 12 en la A1", "Abrimos las cajas B1 B2 y B3", "Movimos unos machos a la D4").
 
-**Question before I start:** Do you want all 5 phases implemented in this single loop, or Phase 1 first with subsequent phases gated on your review? Phase 1 alone is ~6 files + 1 migration; all 5 together is ~25 files + 2 migrations and a much larger surface to review.
+---
+
+## 5. Defense-in-depth: handler allow-list
+
+In `supabase/functions/ai-command/index.ts`, replace any dynamic dispatch with an explicit map:
+
+```ts
+const HANDLERS = {
+  crear_linea_genetica: handleCrearLinea,
+  editar_linea_genetica: handleEditarLinea,
+  crear_caja: handleCrearCaja,
+  // … only the worker-scoped intents
+} as const;
+```
+
+If `intent` is not a key, the operation is rejected with `"intent_not_allowed"` and logged into `ai_journal_runs.results` as an error. This makes prompt-injection bypass impossible even if the LLM hallucinates an admin intent.
+
+---
+
+## 6. Out of scope (intentionally not changing)
+
+- RLS policies (already org-scoped and correct).
+- Telemetry admin UI (`AIAliasesManager`, analytics) — remains admin-only via `RoleRoute`.
+- Voice / suggestions / macros (Phases 2–5 of prior plan) — not part of this request.
+- The execute_batch endpoint's existing "selected ops only" logic — already correct.
+
+---
+
+## Files touched
+
+**Edit:**
+- `supabase/functions/ai-command/schemas.ts` (add clientes/pedidos intents, tighten allow-list)
+- `supabase/functions/ai-command/prompt.ts` (worker role, plan-first language, few-shots)
+- `supabase/functions/ai-command/index.ts` (explicit handler map, intent_not_allowed rejection)
+- `supabase/functions/ai-command/resolve.ts` (resolve clientes by name/alias)
+- `src/data/aiCommand.ts` (`INTENT_LABELS` for new intents)
+- `src/components/ai/AIOperationBatchPreview.tsx` (Plan Operacional copy + grouped header)
+- `src/components/ai/AIOperationCard.tsx` (three labeled sections)
+
+**Create:**
+- `supabase/functions/ai-command/handlers/clientes.ts`
+- `supabase/functions/ai-command/handlers/pedidos.ts`
+
+No DB migrations. No new tables. No RLS changes.
+
+---
+
+## Open question
+
+Do you want **clientes** and **pedidos** included in this loop (recommended, since the brief lists them as allowed modules), or should I ship the role/scope hardening + plan-first UX first and add those two handlers in a second pass?
