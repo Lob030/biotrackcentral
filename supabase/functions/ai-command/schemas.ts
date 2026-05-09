@@ -97,6 +97,60 @@ export const dividirLoteSchema = z.object({
   })).min(1).max(20),
 });
 
+export const CLIENTE_TIPOS = ["general", "laboratorio", "centro_investigacion", "veterinario"] as const;
+export const CLIENTE_ESTADOS = ["activo", "inactivo", "bloqueado"] as const;
+export const PEDIDO_ESTADOS = ["pendiente", "confirmado", "en_preparacion", "listo", "entregado", "cancelado"] as const;
+
+export const crearClienteSchema = z.object({
+  nombre: z.string().trim().min(1).max(160),
+  contacto_principal: z.string().trim().max(160).optional(),
+  email: z.string().trim().email().max(160).optional(),
+  telefono: z.string().trim().max(40).optional(),
+  tipo_cliente: z.enum(CLIENTE_TIPOS).optional(),
+  ciudad: z.string().trim().max(120).optional(),
+  notas: z.string().trim().max(500).optional(),
+});
+
+export const editarClienteSchema = z.object({
+  ref: refStr,
+  cambios: z.object({
+    nombre: z.string().trim().min(1).max(160).optional(),
+    contacto_principal: z.string().trim().max(160).optional(),
+    email: z.string().trim().email().max(160).optional(),
+    telefono: z.string().trim().max(40).optional(),
+    tipo_cliente: z.enum(CLIENTE_TIPOS).optional(),
+    estado_cliente: z.enum(CLIENTE_ESTADOS).optional(),
+    ciudad: z.string().trim().max(120).optional(),
+    notas: z.string().trim().max(500).optional(),
+  }).refine((c) => Object.keys(c).length > 0, "Sin cambios"),
+});
+
+const pedidoLineaSchema = z.object({
+  especie: z.enum(ESPECIES),
+  etapa: z.string().trim().min(1).max(60),
+  cantidad: z.number().int().positive().max(100_000),
+  precio_unitario: z.number().nonnegative().max(10_000_000).optional(),
+});
+
+export const crearPedidoSchema = z.object({
+  cliente: refStr,
+  fecha_pedido: isoDate.optional(),
+  fecha_entrega_solicitada: isoDate.optional(),
+  porcentaje_descuento: z.number().min(0).max(100).optional(),
+  notas: z.string().trim().max(500).optional(),
+  lineas: z.array(pedidoLineaSchema).min(1).max(20),
+});
+
+export const editarPedidoSchema = z.object({
+  ref: refStr, // numero_pedido
+  cambios: z.object({
+    estado: z.enum(PEDIDO_ESTADOS).optional(),
+    fecha_entrega_solicitada: isoDate.optional(),
+    fecha_entrega_realizada: isoDate.optional(),
+    notas: z.string().trim().max(500).optional(),
+  }).refine((c) => Object.keys(c).length > 0, "Sin cambios"),
+});
+
 export const clarificationSchema = z.object({
   razon: z.string().trim().max(300),
   missing_fields: z.array(z.string()).optional(),
