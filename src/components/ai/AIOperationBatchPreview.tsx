@@ -12,10 +12,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AIOperationCard from "./AIOperationCard";
 import AIValidationWarnings from "./AIValidationWarnings";
-import type {
-  BatchParseResult,
-  OperationExecutionResult,
-  ParsedOperation,
+import {
+  INTENT_MODULE,
+  type BatchParseResult,
+  type OperationExecutionResult,
+  type ParsedOperation,
 } from "@/data/aiCommand";
 
 interface Props {
