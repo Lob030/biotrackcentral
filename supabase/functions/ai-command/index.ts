@@ -24,6 +24,8 @@ import { handleCrearLote, handleEditarLote } from "./handlers/lotes.ts";
 import { handleMortalidad } from "./handlers/mortalidad.ts";
 import { handleTraslado } from "./handlers/traslados.ts";
 import { handleDividirLote } from "./handlers/division.ts";
+import { handleCrearCliente, handleEditarCliente } from "./handlers/clientes.ts";
+import { handleCrearPedido, handleEditarPedido } from "./handlers/pedidos.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
