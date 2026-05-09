@@ -121,7 +121,28 @@ export const INTENT_LABELS: Record<string, string> = {
   registrar_mortalidad: "Registrar mortalidad",
   trasladar_animales: "Trasladar animales",
   dividir_lote: "Dividir lote",
+  crear_cliente: "Crear cliente",
+  editar_cliente: "Editar cliente",
+  crear_pedido: "Crear pedido",
+  editar_pedido: "Editar pedido",
   requires_clarification: "Falta Información (Aclaración requerida)",
+};
+
+export const INTENT_MODULE: Record<string, string> = {
+  crear_linea_genetica: "Líneas genéticas",
+  editar_linea_genetica: "Líneas genéticas",
+  crear_caja: "Cajas",
+  editar_caja: "Cajas",
+  crear_lote: "Lotes",
+  editar_lote: "Lotes",
+  registrar_mortalidad: "Lotes",
+  trasladar_animales: "Lotes",
+  dividir_lote: "Lotes",
+  crear_cliente: "Clientes",
+  editar_cliente: "Clientes",
+  crear_pedido: "Pedidos",
+  editar_pedido: "Pedidos",
+  requires_clarification: "Aclaración",
 };
 
 export const DESTRUCTIVE_INTENTS = new Set([
