@@ -49,6 +49,10 @@ const HANDLERS = {
   registrar_mortalidad: handleMortalidad,
   trasladar_animales: handleTraslado,
   dividir_lote: handleDividirLote,
+  crear_cliente: handleCrearCliente,
+  editar_cliente: handleEditarCliente,
+  crear_pedido: handleCrearPedido,
+  editar_pedido: handleEditarPedido,
 } as const;
 
 async function authedClient(req: Request) {
