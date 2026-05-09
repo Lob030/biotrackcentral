@@ -12,10 +12,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AIOperationCard from "./AIOperationCard";
 import AIValidationWarnings from "./AIValidationWarnings";
-import type {
-  BatchParseResult,
-  OperationExecutionResult,
-  ParsedOperation,
+import {
+  INTENT_MODULE,
+  type BatchParseResult,
+  type OperationExecutionResult,
+  type ParsedOperation,
 } from "@/data/aiCommand";
 
 interface Props {
@@ -74,18 +75,30 @@ export default function AIOperationBatchPreview({
     setSelected(allSelected ? new Set() : new Set(allIds));
   };
 
+  // Group ops by module for the plan summary header.
+  const moduleSummary = (() => {
+    const m = new Map<string, number>();
+    batch.operations.forEach((op) => {
+      const mod = INTENT_MODULE[op.intent] ?? "Otros";
+      m.set(mod, (m.get(mod) ?? 0) + 1);
+    });
+    return Array.from(m.entries()).map(([mod, n]) => `${n} ${mod.toLowerCase()}`).join(" · ");
+  })();
+
+  const clarificationCount = batch.operations.length - executableOps.length;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !isExecuting && onClose()}>
       <DialogContent className="sm:max-w-[640px] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="display-font flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            {executed ? "Resultado del lote" : "Operaciones detectadas"}
+            {executed ? "Resultado del plan" : "Plan Operacional Detectado"}
           </DialogTitle>
           <DialogDescription>
             {executed
-              ? `${okCount} ejecutada(s)${errCount ? `, ${errCount} con error` : ""}. Nada más se ejecutará sin tu aprobación.`
-              : `${batch.operations.length} operación(es). Revisa, marca las que quieres ejecutar y confirma.`}
+              ? `${okCount} ejecutada(s)${errCount ? `, ${errCount} con error` : ""}. Nada más se ejecutará sin tu aprobación explícita.`
+              : `Revisa el plan antes de ejecutarlo. Nada se guarda hasta que tú lo apruebes.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -98,7 +111,18 @@ export default function AIOperationBatchPreview({
             </div>
           ) : (
             <>
-              {!executed && (
+              {!executed && moduleSummary && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/80">
+                  <span className="font-semibold text-primary">Resumen del plan: </span>
+                  {moduleSummary}
+                  {clarificationCount > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      {" "}· {clarificationCount} requiere(n) aclaración
+                    </span>
+                  )}
+                </div>
+              )}
+              {!executed && executableOps.length > 0 && (
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <button
                     type="button"
@@ -107,7 +131,7 @@ export default function AIOperationBatchPreview({
                   >
                     {allSelected ? "Deseleccionar todas" : "Seleccionar todas"}
                   </button>
-                  <span>{selectedOps.length} de {batch.operations.length} seleccionada(s)</span>
+                  <span>{selectedOps.length} de {executableOps.length} seleccionada(s)</span>
                 </div>
               )}
               <ScrollArea className="h-[45vh] pr-3">
@@ -128,7 +152,10 @@ export default function AIOperationBatchPreview({
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          <p className="text-[11px] text-muted-foreground sm:mr-auto">
+            Nada se ejecuta sin tu aprobación explícita.
+          </p>
           <Button variant="outline" onClick={onClose} disabled={isExecuting}>
             {executed ? "Cerrar" : "Cancelar"}
           </Button>
@@ -139,7 +166,7 @@ export default function AIOperationBatchPreview({
               className="bg-gradient-primary text-primary-foreground hover:opacity-90"
             >
               {isExecuting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Ejecutar {selectedOps.length} operación(es)
+              Aprobar y ejecutar plan ({selectedOps.length})
             </Button>
           )}
         </DialogFooter>

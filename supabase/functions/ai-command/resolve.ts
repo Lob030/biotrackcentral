@@ -63,3 +63,37 @@ export async function resolveLinea(sb: SupabaseClient, orgId: string, ref: strin
   if (data.length > 1) throw new ResolveError(`"${ref}" coincide con varias líneas; sé más específico.`, 409);
   return data[0];
 }
+
+export async function resolveCliente(sb: SupabaseClient, orgId: string, ref: string) {
+  if (isUuid(ref)) {
+    const { data } = await sb.from("clientes").select("*").eq("id", ref).eq("organization_id", orgId).maybeSingle();
+    if (!data) throw new ResolveError(`Cliente no encontrado: ${ref}`, 404);
+    return data;
+  }
+  const { data, error } = await sb
+    .from("clientes")
+    .select("*")
+    .eq("organization_id", orgId)
+    .ilike("nombre", ref);
+  if (error) throw error;
+  if (!data || data.length === 0) throw new ResolveError(`Cliente no encontrado: "${ref}"`, 404);
+  if (data.length > 1) throw new ResolveError(`"${ref}" coincide con varios clientes; sé más específico.`, 409);
+  return data[0];
+}
+
+export async function resolvePedido(sb: SupabaseClient, orgId: string, ref: string) {
+  if (isUuid(ref)) {
+    const { data } = await sb.from("pedidos").select("*").eq("id", ref).eq("organization_id", orgId).maybeSingle();
+    if (!data) throw new ResolveError(`Pedido no encontrado: ${ref}`, 404);
+    return data;
+  }
+  const { data, error } = await sb
+    .from("pedidos")
+    .select("*")
+    .eq("organization_id", orgId)
+    .ilike("numero_pedido", ref);
+  if (error) throw error;
+  if (!data || data.length === 0) throw new ResolveError(`Pedido no encontrado: "${ref}"`, 404);
+  if (data.length > 1) throw new ResolveError(`"${ref}" coincide con varios pedidos; sé más específico.`, 409);
+  return data[0];
+}
