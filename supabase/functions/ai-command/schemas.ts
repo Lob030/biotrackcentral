@@ -168,6 +168,10 @@ export const INTENT_NAMES = [
   "registrar_mortalidad",
   "trasladar_animales",
   "dividir_lote",
+  "crear_cliente",
+  "editar_cliente",
+  "crear_pedido",
+  "editar_pedido",
   "requires_clarification",
 ] as const;
 export type IntentName = (typeof INTENT_NAMES)[number];
@@ -182,6 +186,10 @@ export const PAYLOAD_SCHEMAS = {
   registrar_mortalidad: mortalidadSchema,
   trasladar_animales: trasladoSchema,
   dividir_lote: dividirLoteSchema,
+  crear_cliente: crearClienteSchema,
+  editar_cliente: editarClienteSchema,
+  crear_pedido: crearPedidoSchema,
+  editar_pedido: editarPedidoSchema,
   requires_clarification: clarificationSchema,
 } as const;
 
