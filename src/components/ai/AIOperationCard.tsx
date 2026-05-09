@@ -122,18 +122,52 @@ export default function AIOperationCard({ op, selected, onToggle, result, disabl
             <p className="text-xs italic text-muted-foreground line-clamp-2">"{op.source_text}"</p>
           )}
 
-          <div className="rounded-lg border border-border/50 bg-muted/20 divide-y divide-border/40">
-            {entries.length === 0 ? (
-              <p className="p-2 text-xs text-muted-foreground">Sin datos.</p>
-            ) : (
-              entries.map(([k, v]) => (
-                <div key={k} className="grid grid-cols-[110px_1fr] gap-3 p-2 text-xs">
-                  <span className="font-medium text-muted-foreground uppercase tracking-wide">{k}</span>
-                  <span className="text-foreground tabular-nums break-words">{renderValue(v)}</span>
-                </div>
-              ))
-            )}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              ✓ Lo que voy a hacer
+            </div>
+            <div className="rounded-lg border border-border/50 bg-muted/20 divide-y divide-border/40">
+              {entries.length === 0 ? (
+                <p className="p-2 text-xs text-muted-foreground">Sin datos.</p>
+              ) : (
+                entries.map(([k, v]) => (
+                  <div key={k} className="grid grid-cols-[110px_1fr] gap-3 p-2 text-xs">
+                    <span className="font-medium text-muted-foreground uppercase tracking-wide">{k}</span>
+                    <span className="text-foreground tabular-nums break-words">{renderValue(v)}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
+
+          {op.explanation && (op.explanation.understood || op.explanation.assumptions_made?.length || op.explanation.entities_resolved?.length) && (
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                🔍 Lo que entendí
+              </div>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2 space-y-1 text-xs">
+                {op.explanation.understood && (
+                  <p className="text-foreground/80">{op.explanation.understood}</p>
+                )}
+                {op.explanation.entities_resolved?.length ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium">Entidades:</span> {op.explanation.entities_resolved.join(", ")}
+                  </p>
+                ) : null}
+                {op.explanation.assumptions_made?.length ? (
+                  <p className="text-amber-700 dark:text-amber-300">
+                    <span className="font-medium">Asumí:</span> {op.explanation.assumptions_made.join("; ")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {lowConfidence && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-800 dark:text-amber-200">
+              <span className="font-semibold">⚠ Información incierta:</span> la confianza es baja, revisa los datos antes de aprobar.
+            </div>
+          )}
 
           {result && (
             <div
