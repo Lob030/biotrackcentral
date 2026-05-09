@@ -313,4 +313,3 @@ export type ValidatedIntent =
   | { intent: "crear_pedido"; confidence: number; payload: z.infer<typeof crearPedidoSchema> }
   | { intent: "editar_pedido"; confidence: number; payload: z.infer<typeof editarPedidoSchema> }
   | { intent: "requires_clarification"; confidence: number; payload: z.infer<typeof clarificationSchema> };
-  | { intent: "requires_clarification"; confidence: number; payload: z.infer<typeof clarificationSchema> };
