@@ -308,4 +308,9 @@ export type ValidatedIntent =
   | { intent: "registrar_mortalidad"; confidence: number; payload: z.infer<typeof mortalidadSchema> }
   | { intent: "trasladar_animales"; confidence: number; payload: z.infer<typeof trasladoSchema> }
   | { intent: "dividir_lote"; confidence: number; payload: z.infer<typeof dividirLoteSchema> }
+  | { intent: "crear_cliente"; confidence: number; payload: z.infer<typeof crearClienteSchema> }
+  | { intent: "editar_cliente"; confidence: number; payload: z.infer<typeof editarClienteSchema> }
+  | { intent: "crear_pedido"; confidence: number; payload: z.infer<typeof crearPedidoSchema> }
+  | { intent: "editar_pedido"; confidence: number; payload: z.infer<typeof editarPedidoSchema> }
+  | { intent: "requires_clarification"; confidence: number; payload: z.infer<typeof clarificationSchema> };
   | { intent: "requires_clarification"; confidence: number; payload: z.infer<typeof clarificationSchema> };
