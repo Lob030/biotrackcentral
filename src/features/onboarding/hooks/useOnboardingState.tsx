@@ -1,13 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { AnimalClass, Purpose, Subtype, WizardStep, WorkspaceDraft } from "../lib/types";
 import { requiresSubtype } from "../lib/onboardingOptions";
 
-const PROGRESS_KEY = "biotrack_onboarding_progress";
 export const PENDING_WORKSPACE_KEY = "biotrack_pending_workspace";
 
 interface OnboardingState {
   currentStep: WizardStep;
-  purpose: Purpose[];
+  purpose: Purpose | null;
   subtype: Subtype | null;
   animalClass: AnimalClass | null;
   species: string;
@@ -15,14 +14,14 @@ interface OnboardingState {
 
 const initial: OnboardingState = {
   currentStep: 1,
-  purpose: [],
+  purpose: null,
   subtype: null,
   animalClass: null,
   species: "",
 };
 
 interface OnboardingContextValue extends OnboardingState {
-  togglePurpose: (p: Purpose) => void;
+  setPurpose: (p: Purpose) => void;
   setSubtype: (s: Subtype) => void;
   setAnimalClass: (a: AnimalClass) => void;
   setSpecies: (s: string) => void;
@@ -39,56 +38,39 @@ interface OnboardingContextValue extends OnboardingState {
 
 const Ctx = createContext<OnboardingContextValue | null>(null);
 
-function loadInitial(): OnboardingState {
-  try {
-    const raw = sessionStorage.getItem(PROGRESS_KEY);
-    if (raw) return { ...initial, ...JSON.parse(raw) };
-  } catch {
-    /* noop */
-  }
-  return initial;
+function getOrder(purpose: Purpose | null): WizardStep[] {
+  return requiresSubtype(purpose) ? [1, 2, 3, 4, "summary"] : [1, 3, 4, "summary"];
 }
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<OnboardingState>(loadInitial);
-
-  useEffect(() => {
-    sessionStorage.setItem(PROGRESS_KEY, JSON.stringify(state));
-  }, [state]);
+  const [state, setState] = useState<OnboardingState>(initial);
 
   const totalSteps = requiresSubtype(state.purpose) ? 4 : 3;
 
-  const stepOrder: WizardStep[] = useMemo(() => {
-    const base: WizardStep[] = [1];
-    if (requiresSubtype(state.purpose)) base.push(2);
-    base.push(3, 4, "summary");
-    return base;
-  }, [state.purpose]);
-
+  const stepOrder = useMemo(() => getOrder(state.purpose), [state.purpose]);
   const progressIndex = Math.max(0, stepOrder.indexOf(state.currentStep));
 
   const canAdvance = useMemo(() => {
     switch (state.currentStep) {
       case 1:
-        return state.purpose.length > 0;
+        return state.purpose !== null;
       case 2:
         return !!state.subtype;
       case 3:
         return !!state.animalClass;
       case 4:
-        return true; // opcional
+        return true;
       case "summary":
         return true;
     }
   }, [state]);
 
-  const togglePurpose = useCallback((p: Purpose) => {
-    setState((s) => {
-      const has = s.purpose.includes(p);
-      const purpose = has ? s.purpose.filter((x) => x !== p) : [...s.purpose, p];
-      const subtype = requiresSubtype(purpose) ? s.subtype : null;
-      return { ...s, purpose, subtype };
-    });
+  const setPurpose = useCallback((purpose: Purpose) => {
+    setState((s) => ({
+      ...s,
+      purpose,
+      subtype: requiresSubtype(purpose) ? s.subtype : null,
+    }));
   }, []);
 
   const setSubtype = useCallback((subtype: Subtype) => setState((s) => ({ ...s, subtype })), []);
@@ -99,7 +81,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const next = useCallback(() => {
     setState((s) => {
-      const order: WizardStep[] = requiresSubtype(s.purpose) ? [1, 2, 3, 4, "summary"] : [1, 3, 4, "summary"];
+      const order = getOrder(s.purpose);
       const i = order.indexOf(s.currentStep);
       const nextStep = i >= 0 && i < order.length - 1 ? order[i + 1] : s.currentStep;
       return { ...s, currentStep: nextStep };
@@ -108,7 +90,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const back = useCallback(() => {
     setState((s) => {
-      const order: WizardStep[] = requiresSubtype(s.purpose) ? [1, 2, 3, 4, "summary"] : [1, 3, 4, "summary"];
+      const order = getOrder(s.purpose);
       const i = order.indexOf(s.currentStep);
       const prev = i > 0 ? order[i - 1] : s.currentStep;
       return { ...s, currentStep: prev };
@@ -116,13 +98,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const reset = useCallback(() => {
-    sessionStorage.removeItem(PROGRESS_KEY);
+    localStorage.removeItem(PENDING_WORKSPACE_KEY);
     setState(initial);
   }, []);
 
   const buildDraft = useCallback((): WorkspaceDraft => {
     return {
-      purpose: state.purpose,
+      purpose: state.purpose!,
       subtype: requiresSubtype(state.purpose) ? state.subtype : null,
       animalClass: state.animalClass!,
       species: state.species.trim() ? state.species.trim() : null,
@@ -133,13 +115,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const confirm = useCallback((): WorkspaceDraft => {
     const draft = buildDraft();
     localStorage.setItem(PENDING_WORKSPACE_KEY, JSON.stringify(draft));
-    sessionStorage.removeItem(PROGRESS_KEY);
     return draft;
   }, [buildDraft]);
 
   const value: OnboardingContextValue = {
     ...state,
-    togglePurpose,
+    setPurpose,
     setSubtype,
     setAnimalClass,
     setSpecies,
