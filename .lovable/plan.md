@@ -1,112 +1,98 @@
-## Goal
+# Plan: Onboarding Wizard (UI + Estado Local)
 
-Constrain the AI Copilot to a **worker-level role** with strict module scope, and enforce a **plan-first, human-approved** execution model across the entire pipeline (parser → preview → execute).
+Flujo de 3-4 pasos para configurar un "workspace" antes de entrar al dashboard. Solo UI, estado en memoria y persistencia en `localStorage`. Sin conexión a base de datos en este prompt.
 
-The current architecture already has parse/execute separation and a preview dialog, but it does NOT enforce module scope at the schema/handler level, and the preview is not framed as an "Operational Plan". This plan closes both gaps.
+Por defecto se preserva el flujo actual existente: `business → Granja/Bioterio → Mamíferos (roedores)` queda como path principal y validado.
 
----
+## Alcance
 
-## 1. Define & enforce the allowed module scope
+- Ruta nueva `/onboarding` con wizard navegable adelante/atrás.
+- Estado centralizado por entorno seleccionado.
+- Posibilidad de añadir múltiples entornos desde el Paso 1.
+- Resumen final antes de confirmar.
+- Tras confirmar: guardar `biotrack_pending_workspace` en `localStorage` y redirigir a `/dashboard` (mock, sin escritura en DB).
 
-**Allowed intents (worker scope):**
-- `crear_linea_genetica`, `editar_linea_genetica`
-- `crear_caja`, `editar_caja`
-- `crear_lote`, `editar_lote`, `registrar_mortalidad`, `trasladar_animales`, `dividir_lote`
-- `crear_cliente`, `editar_cliente` *(new — currently missing)*
-- `crear_pedido`, `editar_pedido` *(new — currently missing)*
-- `requires_clarification`
+## Reglas de negocio
 
-**Forbidden** (must never appear in any code path, prompt, or handler): organization settings, user roles, billing/plan, telemetry admin, alertas config, gastos, analytics, system controls.
+- **Paso 1 — Propósito** (`pet` | `business` | `vet`): selección múltiple vía botón "+ Añadir otro entorno".
+- **Paso 2 — Subtipo** (condicional):
+  - `pet` → se omite por completo.
+  - `business` → 4 opciones: Granja/Bioterio, PIMVS, UMA, Comercializadora.
+  - `vet` → las 4 anteriores + Clínica Veterinaria.
+- **Paso 3 — Clase animal**: Mamíferos, Peces, Reptiles, Anfibios, Aves, Artrópodos, Anélidos.
+- **Paso 4 — Especie/raza** (opcional): input libre, placeholder dinámico según Paso 3 (ej. Mamíferos → "Ratón C57BL/6, conejo NZW…").
 
-**Where this is enforced:**
-1. `supabase/functions/ai-command/schemas.ts` — `INTENT_NAMES` becomes the single source of truth; any intent outside the list is rejected by zod into `invalid[]`.
-2. `supabase/functions/ai-command/index.ts` — handler dispatcher uses an explicit allow-list map; unknown intent → typed error, never executed.
-3. `supabase/functions/ai-command/prompt.ts` — system prompt explicitly states the AI is a *worker*, lists allowed modules, and forbids admin/config/billing/analytics actions.
-4. Frontend `INTENT_LABELS` + `DESTRUCTIVE_INTENTS` updated to match.
+Validación: no avanzar sin selección válida en pasos requeridos. Paso 4 se puede saltar.
 
----
+## Estructura de archivos
 
-## 2. Add the two missing operational modules (Clients & Orders)
-
-New zod schemas + edge handlers:
-- `handlers/clientes.ts` — create/edit client (name, contact, type, notes; org-scoped via RLS).
-- `handlers/pedidos.ts` — create/edit order header + line items (client ref, species, stage, quantity, unit price). Resolution layer matches client by name/alias.
-
-Both go through the same parse → preview → confirm flow as existing handlers. No new tables — uses existing `clientes`, `pedidos`, `pedidos_detalles`.
-
----
-
-## 3. Reframe the preview as an "Operational Plan"
-
-Rename the preview UX language (no logic change to execution gating, which is already correct):
-
-- `AIOperationBatchPreview.tsx` title: **"Plan Operacional Detectado"** instead of "Operaciones detectadas".
-- Each `AIOperationCard` shows three labeled sections:
-  - **✓ Lo que voy a hacer** (intent + payload summary)
-  - **🔍 Lo que entendí / asumí** (`explanation.understood`, `assumptions_made`, `entities_resolved`)
-  - **⚠ Información faltante** (only when `requires_clarification` or low confidence)
-- Group header summarizing total ops by module ("3 cajas, 1 nacimiento, 1 cliente").
-- Confirm button copy: **"Aprobar y ejecutar plan"**.
-- Reinforce in the dialog footer: *"Nada se ejecuta sin tu aprobación explícita."*
-
----
-
-## 4. Strengthen plan-first guarantees in the prompt
-
-Update `prompt.ts` with explicit rules:
-- "Eres un trabajador del bioterio, NO un administrador."
-- "Solo puedes operar sobre: líneas genéticas, cajas, lotes, clientes, pedidos."
-- "NUNCA ejecutas acciones — solo propones un plan que el humano debe aprobar."
-- "Prefiere `requires_clarification` ante cualquier ambigüedad real, pero infiere contexto razonable cuando sea obvio (ej. especie del lote padre, caja vacía implícita)."
-- Few-shot examples matching the user's samples ("Hoy nacieron 12 en la A1", "Abrimos las cajas B1 B2 y B3", "Movimos unos machos a la D4").
-
----
-
-## 5. Defense-in-depth: handler allow-list
-
-In `supabase/functions/ai-command/index.ts`, replace any dynamic dispatch with an explicit map:
-
-```ts
-const HANDLERS = {
-  crear_linea_genetica: handleCrearLinea,
-  editar_linea_genetica: handleEditarLinea,
-  crear_caja: handleCrearCaja,
-  // … only the worker-scoped intents
-} as const;
+```text
+src/
+  features/
+    onboarding/
+      OnboardingWizard.tsx          // contenedor + navegación condicional
+      steps/
+        StepPurpose.tsx             // Paso 1
+        StepSubtype.tsx             // Paso 2 (condicional)
+        StepAnimalClass.tsx         // Paso 3
+        StepSpecies.tsx             // Paso 4 (opcional)
+        WorkspaceSummary.tsx        // Resumen + Confirmar
+      hooks/
+        useOnboardingState.ts       // estado, validación, persistencia
+      lib/
+        onboardingOptions.ts        // listas de opciones + placeholders
+        types.ts                    // Purpose, Subtype, AnimalClass, WorkspaceDraft
+  pages/
+    Onboarding.tsx                  // wrapper de ruta
 ```
 
-If `intent` is not a key, the operation is rejected with `"intent_not_allowed"` and logged into `ai_journal_runs.results` as an error. This makes prompt-injection bypass impossible even if the LLM hallucinates an admin intent.
+Nueva ruta en `src/App.tsx`: `/onboarding` (protegida por `ProtectedRoute`, lazy-loaded). No se modifica el resto del routing.
 
----
+## Estado y persistencia
 
-## 6. Out of scope (intentionally not changing)
+`useOnboardingState()` (Context + reducer, sin Zustand para no añadir dependencias):
 
-- RLS policies (already org-scoped and correct).
-- Telemetry admin UI (`AIAliasesManager`, analytics) — remains admin-only via `RoleRoute`.
-- Voice / suggestions / macros (Phases 2–5 of prior plan) — not part of this request.
-- The execute_batch endpoint's existing "selected ops only" logic — already correct.
+- `currentStep: 1 | 2 | 3 | 4 | 'summary'`
+- `purpose: Purpose[]` (array, soporta múltiples entornos en Paso 1)
+- `subtype: Subtype | null` (null si solo `pet`)
+- `animalClass: AnimalClass | null`
+- `species: string` (opcional)
+- Acciones: `setPurpose`, `addPurpose`, `setSubtype`, `setAnimalClass`, `setSpecies`, `next()`, `back()`, `reset()`.
+- `next()` aplica el salto: si `purpose` contiene solo `pet`, brinca de Paso 1 a Paso 3.
+- `back()` aplica el mismo salto inverso para no perder datos.
+- Validación derivada: `canAdvance(step)` booleano.
+- Persistencia ligera del progreso en `sessionStorage` (`biotrack_onboarding_progress`) para no perder selecciones al recargar.
 
----
+Al confirmar en `WorkspaceSummary`:
 
-## Files touched
+```ts
+const workspaceDraft = {
+  purpose,           // Purpose[]
+  subtype,           // Subtype | null
+  animalClass,
+  species: species || null,
+  name: `Entorno ${new Date().toISOString()}`,
+};
+localStorage.setItem('biotrack_pending_workspace', JSON.stringify(workspaceDraft));
+navigate('/dashboard');
+```
 
-**Edit:**
-- `supabase/functions/ai-command/schemas.ts` (add clientes/pedidos intents, tighten allow-list)
-- `supabase/functions/ai-command/prompt.ts` (worker role, plan-first language, few-shots)
-- `supabase/functions/ai-command/index.ts` (explicit handler map, intent_not_allowed rejection)
-- `supabase/functions/ai-command/resolve.ts` (resolve clientes by name/alias)
-- `src/data/aiCommand.ts` (`INTENT_LABELS` for new intents)
-- `src/components/ai/AIOperationBatchPreview.tsx` (Plan Operacional copy + grouped header)
-- `src/components/ai/AIOperationCard.tsx` (three labeled sections)
+## UI
 
-**Create:**
-- `supabase/functions/ai-command/handlers/clientes.ts`
-- `supabase/functions/ai-command/handlers/pedidos.ts`
+- Tailwind + componentes existentes de `@/components/ui` (Button, Card, RadioGroup, Input, Label, Progress).
+- Header con barra de progreso (`Progress`) calculada sobre los pasos efectivos (3 si solo `pet`, 4 en otros casos).
+- Cada paso: título, subtítulo, grid de opciones como tarjetas seleccionables, botones "Atrás" / "Continuar".
+- Paso 1 muestra siempre botón secundario "+ Añadir otro entorno" que agrega una entrada al array `purpose` sin avanzar.
+- `WorkspaceSummary` lista propósito(s), subtipo, clase animal, especie y `name` generado, con botones "Editar" (vuelve al paso correspondiente) y "Confirmar y entrar al Dashboard".
 
-No DB migrations. No new tables. No RLS changes.
+## Restricciones respetadas
 
----
+- Sin llamadas a Supabase, sin SQL, sin edge functions.
+- Sin lógica de IA, planes ni facturación.
+- Solo UI, estado local y `localStorage` / `sessionStorage`.
 
-## Open question
+## Fuera de alcance (Prompt 2)
 
-Do you want **clientes** and **pedidos** included in this loop (recommended, since the brief lists them as allowed modules), or should I ship the role/scope hardening + plan-first UX first and add those two handlers in a second pass?
+- Persistir `workspaceDraft` en la base de datos.
+- Multi-tenancy real (`workspace_id` en queries, RLS).
+- Migración de datos existentes al nuevo modelo de workspaces.
