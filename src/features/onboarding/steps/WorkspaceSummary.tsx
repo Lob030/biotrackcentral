@@ -34,7 +34,7 @@ export default function WorkspaceSummary({ onConfirm }: Props) {
       </div>
 
       <Card className="p-4 divide-y">
-        <Row label="Propósito" value={purposeLabels} step={1} />
+        <Row label="Propósito" value={purposeLabel} step={1} />
         {requiresSubtype(purpose) && <Row label="Tipo de gestión" value={subtype ?? "—"} step={2} />}
         <Row label="Clase animal" value={animalClass ?? "—"} step={3} />
         <Row label="Especie / raza" value={species.trim() || "No especificada"} step={4} />
