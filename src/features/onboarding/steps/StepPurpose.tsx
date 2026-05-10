@@ -1,35 +1,31 @@
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Check, Plus } from "lucide-react";
+import { Check } from "lucide-react";
 import { useOnboardingState } from "../hooks/useOnboardingState";
 import { PURPOSE_OPTIONS } from "../lib/onboardingOptions";
-import type { Purpose } from "../lib/types";
 
 export default function StepPurpose() {
-  const { purpose, togglePurpose } = useOnboardingState();
-
-  const handleAddAnother = () => {
-    const next = PURPOSE_OPTIONS.find((o) => !purpose.includes(o.value));
-    if (next) togglePurpose(next.value);
-  };
+  const { purpose, setPurpose } = useOnboardingState();
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold">¿Para qué usarás BioTrack?</h2>
-        <p className="text-muted-foreground mt-1">Puedes seleccionar uno o más entornos.</p>
+        <p className="text-muted-foreground mt-1">
+          Selecciona el propósito de este entorno. Podrás crear más entornos desde el dashboard.
+        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {PURPOSE_OPTIONS.map((opt) => {
-          const selected = purpose.includes(opt.value as Purpose);
+          const selected = purpose === opt.value;
           return (
             <Card
               key={opt.value}
               role="button"
               tabIndex={0}
-              onClick={() => togglePurpose(opt.value)}
-              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && togglePurpose(opt.value)}
+              aria-pressed={selected}
+              onClick={() => setPurpose(opt.value)}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setPurpose(opt.value)}
               className={`p-4 cursor-pointer transition-colors border-2 ${
                 selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
               }`}
@@ -45,17 +41,6 @@ export default function StepPurpose() {
           );
         })}
       </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={handleAddAnother}
-        disabled={purpose.length >= PURPOSE_OPTIONS.length}
-      >
-        <Plus className="h-4 w-4" />
-        Añadir otro entorno
-      </Button>
     </div>
   );
 }

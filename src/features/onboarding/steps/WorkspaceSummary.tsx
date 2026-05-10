@@ -11,9 +11,7 @@ interface Props {
 export default function WorkspaceSummary({ onConfirm }: Props) {
   const { purpose, subtype, animalClass, species, goTo, buildDraft } = useOnboardingState();
   const draft = buildDraft();
-  const purposeLabels = purpose
-    .map((p) => PURPOSE_OPTIONS.find((o) => o.value === p)?.label ?? p)
-    .join(", ");
+  const purposeLabel = PURPOSE_OPTIONS.find((o) => o.value === purpose)?.label ?? "—";
 
   const Row = ({ label, value, step }: { label: string; value: string; step: 1 | 2 | 3 | 4 }) => (
     <div className="flex items-center justify-between py-3 border-b last:border-0">
@@ -36,7 +34,7 @@ export default function WorkspaceSummary({ onConfirm }: Props) {
       </div>
 
       <Card className="p-4 divide-y">
-        <Row label="Propósito" value={purposeLabels} step={1} />
+        <Row label="Propósito" value={purposeLabel} step={1} />
         {requiresSubtype(purpose) && <Row label="Tipo de gestión" value={subtype ?? "—"} step={2} />}
         <Row label="Clase animal" value={animalClass ?? "—"} step={3} />
         <Row label="Especie / raza" value={species.trim() || "No especificada"} step={4} />

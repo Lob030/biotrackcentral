@@ -9,14 +9,14 @@ export const PURPOSE_OPTIONS: { value: Purpose; label: string; description: stri
 const BUSINESS_SUBTYPES: Subtype[] = ["Granja/Bioterio", "PIMVS", "UMA", "Comercializadora"];
 const VET_SUBTYPES: Subtype[] = [...BUSINESS_SUBTYPES, "Clínica Veterinaria"];
 
-export function getSubtypesFor(purposes: Purpose[]): Subtype[] {
-  if (purposes.includes("vet")) return VET_SUBTYPES;
-  if (purposes.includes("business")) return BUSINESS_SUBTYPES;
+export function getSubtypesFor(purpose: Purpose | null): Subtype[] {
+  if (purpose === "vet") return VET_SUBTYPES;
+  if (purpose === "business") return BUSINESS_SUBTYPES;
   return [];
 }
 
-export function requiresSubtype(purposes: Purpose[]): boolean {
-  return purposes.some((p) => p === "business" || p === "vet");
+export function requiresSubtype(purpose: Purpose | null): boolean {
+  return purpose === "business" || purpose === "vet";
 }
 
 export const ANIMAL_CLASS_OPTIONS: AnimalClass[] = [

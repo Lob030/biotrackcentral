@@ -17,7 +17,7 @@ export type AnimalClass =
   | "Anélidos";
 
 export interface WorkspaceDraft {
-  purpose: Purpose[];
+  purpose: Purpose;
   subtype: Subtype | null;
   animalClass: AnimalClass;
   species: string | null;
