@@ -33,6 +33,7 @@ const ClientePerfil = lazy(() => import("./pages/ClientePerfil"));
 const Pedidos = lazy(() => import("./pages/Pedidos"));
 const Ventas = lazy(() => import("./pages/Ventas"));
 const MasterPanel = lazy(() => import("./pages/MasterPanel"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +74,10 @@ const App = () => (
                 }
               />
               <Route path="/auth" element={<Auth />} />
+              <Route
+                path="/onboarding"
+                element={<ProtectedRoute>{withSuspense(<Onboarding />)}</ProtectedRoute>}
+              />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/lineas" element={withSuspense(<LineasGeneticas />)} />
