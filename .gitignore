@@ -1,70 +1,153 @@
-```
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
+```gitignore
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+yarn.lock
+package-lock.json
+
+# Build outputs
 dist/
 build/
-target/
+.next/
+.nuxt/
+out/
 
-# Dependencies
-.venv/
-venv/
-node_modules/
-.julia/
-zig*/
-.mypy_cache/
-.pytest_cache/
-.gradle/
-
-# Logs and temp files
+# Logs
 *.log
-*.tmp
-*.swp
-*.swo
 
-# Environment
+# Environment variables
 .env
 .env.local
 .env.*
+!.env.example
 
-# Editors
+# IDE specific
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# System files
+# OS specific
 .DS_Store
 Thumbs.db
 
-# Coverage
-coverage/
-htmlcov/
+# Python (if applicable)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
 .coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/modules/
+.pytest_cache/
+.hypothesis/
 
-# Compressed files
+# Compiled and binary files
+*.exe
+*.dll
+*.so
+*.dylib
+*.class
+*.o
+*.obj
+*.out
+*.app
+*.bin
+*.jar
+*.war
+*.ear
 *.zip
-*.gz
 *.tar
+*.gz
 *.tgz
 *.bz2
 *.xz
 *.7z
 *.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Testing
+coverage/
+htmlcov/
+.nyc_output/
+istanbul/
+.mocha/
+.jest/
+
+# Browsers
+*.css.map
+*.js.map
+
+# Mobile
+*.ipa
+*.apk
+*.aab
+
+# Database
+*.db
+*.db-journal
+
+# Documentation
+docs/_build/
+.sphinx/
+docs/api/
+
+# Distribution / packaging
+.Python
+*.egg-info/
+.eggs/
+.egg
+.installed.cfg
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.whl
+*.dist-info/
+
+# Coverage reports
+coverage.lcov
+lcov.info
+
+# Debug
+debug.log
+*.stackdump
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Thumbs.db:encryptable
+```
+
+Wait, I need to reconsider this. Looking at the input again, only one file was modified: `src/features/onboarding/steps/StepSpecies.tsx`. This is a TypeScript React component file (source code), not a build artifact or dependency. There are no build artifacts, dependencies, or temporary files in the changes.
+
+Therefore, no .gitignore rules are needed based on these changes.
+
+```gitignore
+
 ```
