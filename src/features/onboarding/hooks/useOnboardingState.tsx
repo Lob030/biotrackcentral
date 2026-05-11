@@ -1,15 +1,19 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { AnimalClass, Purpose, Subtype, WizardStep, WorkspaceDraft } from "../lib/types";
 import { requiresSubtype } from "../lib/onboardingOptions";
+import type { PreloadedSpeciesId } from "@/lib/species-config";
 
 export const PENDING_WORKSPACE_KEY = "biotrack_pending_workspace";
+
+type SpeciesChoice = PreloadedSpeciesId | "custom" | null;
 
 interface OnboardingState {
   currentStep: WizardStep;
   purpose: Purpose | null;
   subtype: Subtype | null;
   animalClass: AnimalClass | null;
-  species: string;
+  speciesChoice: SpeciesChoice;
+  customSpecies: string;
 }
 
 const initial: OnboardingState = {
@@ -17,14 +21,16 @@ const initial: OnboardingState = {
   purpose: null,
   subtype: null,
   animalClass: null,
-  species: "",
+  speciesChoice: null,
+  customSpecies: "",
 };
 
-interface OnboardingContextValue extends OnboardingState {
+interface OnboardingContextValue extends Omit<OnboardingState, never> {
   setPurpose: (p: Purpose) => void;
   setSubtype: (s: Subtype) => void;
   setAnimalClass: (a: AnimalClass) => void;
-  setSpecies: (s: string) => void;
+  setSpecies: (value: PreloadedSpeciesId | "custom", customText?: string) => void;
+  setCustomSpeciesText: (t: string) => void;
   goTo: (step: WizardStep) => void;
   next: () => void;
   back: () => void;
@@ -75,7 +81,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const setSubtype = useCallback((subtype: Subtype) => setState((s) => ({ ...s, subtype })), []);
   const setAnimalClass = useCallback((animalClass: AnimalClass) => setState((s) => ({ ...s, animalClass })), []);
-  const setSpecies = useCallback((species: string) => setState((s) => ({ ...s, species })), []);
+
+  const setSpecies = useCallback((value: PreloadedSpeciesId | "custom", customText?: string) => {
+    setState((s) => ({
+      ...s,
+      speciesChoice: value,
+      customSpecies: value === "custom" ? (customText ?? s.customSpecies) : "",
+    }));
+  }, []);
+
+  const setCustomSpeciesText = useCallback((t: string) => {
+    setState((s) => ({ ...s, customSpecies: t, speciesChoice: "custom" }));
+  }, []);
 
   const goTo = useCallback((step: WizardStep) => setState((s) => ({ ...s, currentStep: step })), []);
 
@@ -103,11 +120,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const buildDraft = useCallback((): WorkspaceDraft => {
+    let species: PreloadedSpeciesId | string | null;
+    if (state.speciesChoice === "custom") {
+      const txt = state.customSpecies.trim();
+      species = txt.length > 0 ? txt : null;
+    } else {
+      species = state.speciesChoice; // PreloadedSpeciesId | null
+    }
     return {
       purpose: state.purpose!,
       subtype: requiresSubtype(state.purpose) ? state.subtype : null,
       animalClass: state.animalClass!,
-      species: state.species.trim() ? state.species.trim() : null,
+      species,
       name: `Entorno ${new Date().toISOString()}`,
     };
   }, [state]);
@@ -124,6 +148,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setSubtype,
     setAnimalClass,
     setSpecies,
+    setCustomSpeciesText,
     goTo,
     next,
     back,

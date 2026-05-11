@@ -1,3 +1,5 @@
+import type { PreloadedSpeciesId } from "@/lib/species-config";
+
 export type Purpose = "pet" | "business" | "vet";
 
 export type Subtype =
@@ -20,7 +22,7 @@ export interface WorkspaceDraft {
   purpose: Purpose;
   subtype: Subtype | null;
   animalClass: AnimalClass;
-  species: string | null;
+  species: PreloadedSpeciesId | string | null;
   name: string;
 }
 
