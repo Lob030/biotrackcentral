@@ -7,7 +7,14 @@ import { SPECIES_PLACEHOLDER } from "../lib/onboardingOptions";
 import { PRELOADED_SPECIES } from "@/lib/species-config";
 
 export default function StepSpecies() {
-  const { animalClass, speciesChoice, customSpecies, setSpecies, setCustomSpeciesText } = useOnboardingState();
+  const { purpose, subtype, animalClass, speciesChoice, customSpecies, setSpecies, setCustomSpeciesText } = useOnboardingState();
+  
+  // Mostrar especies pre-cargadas solo para: Propósito business → Subtipo Granja/Bioterio → Clase Mamíferos
+  const showProductionSpecies = 
+    purpose === "business" && 
+    subtype === "Granja/Bioterio" && 
+    animalClass === "Mamíferos";
+  
   const placeholder = animalClass ? SPECIES_PLACEHOLDER[animalClass] : "Especie o raza específica";
 
   return (
@@ -20,7 +27,7 @@ export default function StepSpecies() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {PRELOADED_SPECIES.map((s) => {
+        {showProductionSpecies && PRELOADED_SPECIES.map((s) => {
           const selected = speciesChoice === s.id;
           return (
             <Card
@@ -75,7 +82,7 @@ export default function StepSpecies() {
         })()}
       </div>
 
-      {speciesChoice === "custom" && (
+      {(speciesChoice === "custom" || !showProductionSpecies) && (
         <div className="space-y-2 max-w-md">
           <Label htmlFor="custom-species">Especie / raza</Label>
           <Input
@@ -83,7 +90,7 @@ export default function StepSpecies() {
             value={customSpecies}
             onChange={(e) => setCustomSpeciesText(e.target.value)}
             placeholder={placeholder}
-            autoFocus
+            autoFocus={!showProductionSpecies}
           />
         </div>
       )}
