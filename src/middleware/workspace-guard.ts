@@ -43,7 +43,9 @@ export function useWorkspaceGuard() {
 
     const checkWorkspace = async () => {
       try {
-        const { data, error } = await supabase
+        // NOTE: la tabla `workspaces` aún no existe en el schema (se crea en el Prompt 2 de DB).
+        // Hasta entonces hacemos cast a any para evitar romper el build de tipos.
+        const { data, error } = await (supabase as any)
           .from("workspaces")
           .select("id")
           .eq("user_id", user.id)
