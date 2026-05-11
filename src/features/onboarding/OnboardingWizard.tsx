@@ -16,7 +16,7 @@ function WizardInner() {
 
   const handleConfirm = () => {
     confirm();
-    navigate("/dashboard");
+    navigate("/dashboard?onboarding_complete=true", { replace: true });
   };
 
   const isFirst = currentStep === 1;

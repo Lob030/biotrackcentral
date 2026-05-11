@@ -30,7 +30,11 @@ export default function Auth() {
   const [suPwd, setSuPwd] = useState("");
 
   useEffect(() => {
-    if (!loading && user) navigate("/dashboard", { replace: true });
+    if (!loading && user) {
+      // No redirigimos directamente a /dashboard aquí porque el guard de workspace
+      // se encargará de redirigir a /onboarding si el usuario no tiene workspaces
+      navigate("/dashboard", { replace: true });
+    }
   }, [user, loading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -40,7 +44,7 @@ export default function Auth() {
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Bienvenido");
-    navigate("/dashboard", { replace: true });
+    // No redirigimos aquí: el useEffect de arriba + workspace guard se encargan
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -57,7 +61,7 @@ export default function Auth() {
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Cuenta creada");
-    navigate("/dashboard", { replace: true });
+    // No redirigimos aquí: el useEffect de arriba + workspace guard se encargan
   };
 
   const handleGoogle = async () => {
