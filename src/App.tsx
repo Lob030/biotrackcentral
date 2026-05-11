@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import RequireWorkspace from "@/components/RequireWorkspace";
 import AppLayout from "@/components/AppLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import PageLoader from "@/components/PageLoader";
@@ -78,7 +79,7 @@ const App = () => (
                 path="/onboarding"
                 element={<ProtectedRoute>{withSuspense(<Onboarding />)}</ProtectedRoute>}
               />
-              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route element={<ProtectedRoute><RequireWorkspace><AppLayout /></RequireWorkspace></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/lineas" element={withSuspense(<LineasGeneticas />)} />
                 <Route path="/cajas" element={withSuspense(<Cajas />)} />
