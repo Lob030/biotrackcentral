@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function WorkspaceSummary({ onConfirm }: Props) {
-  const { purpose, subtype, animalClass, goTo, buildDraft } = useOnboardingState();
+  const { purpose, subtype, animalClass, goTo, buildDraft, isSubmitting } = useOnboardingState();
   const draft = buildDraft();
   const purposeLabel = PURPOSE_OPTIONS.find((o) => o.value === purpose)?.label ?? "—";
   const speciesLabel = draft.species ?? "No especificada";
