@@ -16,7 +16,7 @@ export default function AppLayout() {
             <Outlet />
           </main>
         </div>
-        <AICommandBar />
+        <AIAgentBar />
       </div>
     </SidebarProvider>
   );
