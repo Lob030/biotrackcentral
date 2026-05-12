@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import type { AnimalClass, Purpose, Subtype, WizardStep, WorkspaceDraft } from "../lib/types";
 import { requiresSubtype } from "../lib/onboardingOptions";
 import type { PreloadedSpeciesId } from "@/lib/species-config";
+import { ACTIVE_WORKSPACE_KEY, createWorkspaceFromDraft, type WorkspaceRow } from "@/lib/workspace";
 
 export const PENDING_WORKSPACE_KEY = "biotrack_pending_workspace";
 
