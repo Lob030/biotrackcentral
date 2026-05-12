@@ -53,9 +53,9 @@ export default function AIPlanPreview({ plan, open, onClose, onConfirm, isExecut
       const ok = await confirm({
         title: "Confirmar acciones destructivas",
         description: `${toExecute.length} operación(es) seleccionada(s) modificarán datos existentes (mortalidad, traslado o división). ¿Continuar?`,
-        confirmText: "Sí, ejecutar",
-        cancelText: "Cancelar",
-        variant: "destructive",
+        confirmLabel: "Sí, ejecutar",
+        cancelLabel: "Cancelar",
+        tone: "destructive",
       });
       if (!ok) return;
     }
