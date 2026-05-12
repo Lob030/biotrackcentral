@@ -138,10 +138,20 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     };
   }, [state]);
 
-  const confirm = useCallback((): WorkspaceDraft => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const confirm = useCallback(async (): Promise<WorkspaceRow> => {
     const draft = buildDraft();
     localStorage.setItem(PENDING_WORKSPACE_KEY, JSON.stringify(draft));
-    return draft;
+    setIsSubmitting(true);
+    try {
+      const ws = await createWorkspaceFromDraft(draft);
+      localStorage.setItem(ACTIVE_WORKSPACE_KEY, ws.id);
+      localStorage.removeItem(PENDING_WORKSPACE_KEY);
+      return ws;
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [buildDraft]);
 
   const value: OnboardingContextValue = {
@@ -160,6 +170,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     progressIndex,
     buildDraft,
     confirm,
+    isSubmitting,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
