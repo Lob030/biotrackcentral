@@ -17,7 +17,7 @@ import { Building2, Users, Save, Shield, Image as ImageIcon, Upload, Trash2, Fla
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { Navigate } from "react-router-dom";
-import AIAliasesManager from "@/components/ai/AIAliasesManager";
+
 
 type AppRole = "admin" | "trabajador";
 
