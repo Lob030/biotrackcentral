@@ -10,38 +10,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import AIOperationBatchPreview from "./AIOperationBatchPreview";
-import {
-  executeBatch,
-  parseBatch,
-  sendAITelemetry,
-  type BatchParseResult,
-  type OperationExecutionResult,
-  type ParsedOperation,
-} from "@/data/aiCommand";
+import AIPlanPreview from "./AIPlanPreview";
+import { planAction, executePlan, type PlanResponse } from "@/lib/ai/client";
+import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import {
   invalidateCajas,
+  invalidateClientes,
   invalidateLoteEventos,
   invalidateLotes,
+  invalidatePedidos,
 } from "@/lib/invalidations";
 import { toast } from "sonner";
 
 const EXAMPLES = [
-  "Crea línea genética C57BL/6, especie Raton",
-  "Añade cajas A1, A2, A3 (uso engorda) en zona A",
-  `Hoy añadimos 4 cajas: B1, B2, B3, B4 (libres, zona B).
-También en la caja A1 nacieron 12.
-Y añadimos línea genética Ratón 1, origen Criadero Conejitos.`,
+  "Crea cajas A1, A2, A3 (uso engorda) en zona A",
+  "Crea línea genética C57BL/6, especie Raton, origen Criadero X",
+  "En la caja A1 nacieron 12 ratones machos hoy",
 ];
 
-export default function AICommandBar() {
+export default function AIAgentBar() {
   const qc = useQueryClient();
+  const { workspaceId } = useActiveWorkspace();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
-  const [parsing, setParsing] = useState(false);
+  const [planning, setPlanning] = useState(false);
   const [executing, setExecuting] = useState(false);
-  const [batch, setBatch] = useState<BatchParseResult | null>(null);
-  const [results, setResults] = useState<OperationExecutionResult[] | null>(null);
+  const [plan, setPlan] = useState<PlanResponse | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -61,72 +55,56 @@ export default function AICommandBar() {
 
   const submit = async () => {
     const t = text.trim();
-    if (!t || parsing) return;
-    setParsing(true);
-    const t0 = performance.now();
+    if (!t || planning) return;
+    if (!workspaceId) {
+      toast.error("Selecciona un entorno antes de usar el agente IA.");
+      return;
+    }
+    setPlanning(true);
     try {
-      const parsed = await parseBatch(t);
-      const dur = Math.round(performance.now() - t0);
-      sendAITelemetry("parse_success", dur, {
-        ops: parsed.operations.length,
-        invalid: parsed.invalid.length,
-        clarifications: parsed.operations.filter((o) => o.intent === "requires_clarification").length,
-        text_len: t.length,
-      });
-      if (parsed.operations.length === 0 && parsed.invalid.length === 0) {
-        toast.error("No se detectaron operaciones en la nota.");
+      const result = await planAction(t, workspaceId);
+      if (result.operations.length === 0 && result.invalid.length === 0) {
+        toast.error("No se detectaron operaciones en tu instrucción.");
         return;
       }
-      setBatch(parsed);
-      setResults(null);
+      setPlan(result);
       setOpen(false);
-    } catch (e: any) {
-      sendAITelemetry("parse_failed", Math.round(performance.now() - t0), {
-        error: String(e?.message ?? e).slice(0, 200),
-      });
-      toast.error(e?.message ?? "No se pudo interpretar la nota");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error desconocido";
+      toast.error(msg);
     } finally {
-      setParsing(false);
+      setPlanning(false);
     }
   };
 
   const cancel = () => {
-    if (batch && !results) {
-      sendAITelemetry("batch_abandoned", undefined, {
-        ops: batch.operations.length,
-      });
-    }
-    setBatch(null);
-    setResults(null);
-    if (results) setText("");
+    setPlan(null);
+    setText("");
   };
 
-  const confirm = async (selected: ParsedOperation[]) => {
-    if (!batch || selected.length === 0) return;
+  const confirm = async (approvedIds: string[]) => {
+    if (!plan || approvedIds.length === 0) return;
     setExecuting(true);
-    const t0 = performance.now();
     try {
-      const res = await executeBatch(batch.note, selected);
-      setResults(res.results);
+      const res = await executePlan(plan.plan_id, approvedIds);
       const ok = res.results.filter((r) => r.status === "ok").length;
       const err = res.results.length - ok;
-      sendAITelemetry("batch_executed", Math.round(performance.now() - t0), {
-        selected: selected.length,
-        ok,
-        err,
-      });
       if (err === 0) toast.success(`${ok} operación(es) ejecutada(s).`);
       else if (ok === 0) toast.error(`Todas fallaron (${err}).`);
       else toast.warning(`${ok} ejecutada(s), ${err} con error.`);
+
       invalidateLotes(qc);
       invalidateLoteEventos(qc);
       invalidateCajas(qc);
+      invalidateClientes(qc);
+      invalidatePedidos(qc);
       qc.invalidateQueries({ queryKey: ["lineas_geneticas"] });
-    } catch (e: any) {
-      sendAITelemetry("batch_failed", Math.round(performance.now() - t0), {
-        error: String(e?.message ?? e).slice(0, 200),
-      });
-      toast.error(e?.message ?? "No se pudo ejecutar el lote");
+
+      setPlan(null);
+      setText("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error desconocido";
+      toast.error(msg);
     } finally {
       setExecuting(false);
     }
@@ -137,25 +115,25 @@ export default function AICommandBar() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Abrir copiloto IA"
+        aria-label="Abrir agente IA"
         className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-gradient-primary text-primary-foreground px-4 py-3 shadow-glow hover:opacity-90 transition-opacity"
       >
         <Sparkles className="h-4 w-4" />
-        <span className="text-sm font-medium hidden sm:inline">Copiloto</span>
+        <span className="text-sm font-medium hidden sm:inline">Agente IA</span>
         <kbd className="hidden md:inline ml-1 text-[10px] rounded bg-primary-foreground/20 px-1.5 py-0.5">
           ⌘K
         </kbd>
       </button>
 
-      <Dialog open={open} onOpenChange={(o) => !parsing && setOpen(o)}>
+      <Dialog open={open} onOpenChange={(o) => !planning && setOpen(o)}>
         <DialogContent className="sm:max-w-[620px]">
           <DialogHeader>
             <DialogTitle className="display-font flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              Copiloto operativo
+              Agente IA
             </DialogTitle>
             <DialogDescription>
-              Escribe o pega una nota con varias acciones. La IA propone, tú confirmas cuáles ejecutar.
+              Describe lo que quieres hacer. El agente prepara un plan, tú revisas y autorizas qué se ejecuta.
             </DialogDescription>
           </DialogHeader>
 
@@ -170,24 +148,22 @@ export default function AICommandBar() {
                   submit();
                 }
               }}
-              placeholder={`Ej: "Hoy añadimos cajas B1, B2, B3 en zona B. En A1 nacieron 12. Nueva línea Ratón 1."`}
-              disabled={parsing}
+              placeholder='Ej: "Crea cajas B1, B2 en zona B uso engorda y registra 3 muertes en lote L-001"'
+              disabled={planning}
               rows={5}
               className="resize-y"
             />
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-muted-foreground">
-                ⌘/Ctrl + Enter para enviar
-              </span>
+              <span className="text-[11px] text-muted-foreground">⌘/Ctrl + Enter para enviar</span>
               <Button
                 onClick={submit}
-                disabled={parsing || !text.trim()}
+                disabled={planning || !text.trim()}
                 className="bg-gradient-primary text-primary-foreground hover:opacity-90"
               >
-                {parsing ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Interpretando…</>
+                {planning ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Planeando…</>
                 ) : (
-                  <><Send className="h-4 w-4 mr-2" /> Analizar</>
+                  <><Send className="h-4 w-4 mr-2" /> Generar plan</>
                 )}
               </Button>
             </div>
@@ -201,7 +177,7 @@ export default function AICommandBar() {
                   key={ex}
                   type="button"
                   onClick={() => setText(ex)}
-                  className="text-left text-xs rounded-lg border border-border/60 bg-muted/40 hover:bg-muted px-3 py-2 text-muted-foreground hover:text-foreground transition-colors whitespace-pre-line"
+                  className="text-left text-xs rounded-lg border border-border/60 bg-muted/40 hover:bg-muted px-3 py-2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {ex}
                 </button>
@@ -211,13 +187,12 @@ export default function AICommandBar() {
         </DialogContent>
       </Dialog>
 
-      <AIOperationBatchPreview
-        batch={batch}
-        open={!!batch}
+      <AIPlanPreview
+        plan={plan}
+        open={!!plan}
         onClose={cancel}
         onConfirm={confirm}
         isExecuting={executing}
-        results={results}
       />
     </>
   );
