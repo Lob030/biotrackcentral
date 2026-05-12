@@ -817,6 +817,45 @@ export type Database = {
         }
         Relationships: []
       }
+      workspaces: {
+        Row: {
+          animal_class: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          purpose: string
+          species: string | null
+          subtype: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          animal_class?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          purpose: string
+          species?: string | null
+          subtype?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          animal_class?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          purpose?: string
+          species?: string | null
+          subtype?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

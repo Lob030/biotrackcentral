@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function WorkspaceSummary({ onConfirm }: Props) {
-  const { purpose, subtype, animalClass, goTo, buildDraft } = useOnboardingState();
+  const { purpose, subtype, animalClass, goTo, buildDraft, isSubmitting } = useOnboardingState();
   const draft = buildDraft();
   const purposeLabel = PURPOSE_OPTIONS.find((o) => o.value === purpose)?.label ?? "—";
   const speciesLabel = draft.species ?? "No especificada";
@@ -46,8 +46,8 @@ export default function WorkspaceSummary({ onConfirm }: Props) {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={onConfirm} size="lg">
-          Confirmar y entrar al Dashboard
+        <Button onClick={onConfirm} size="lg" disabled={isSubmitting}>
+          {isSubmitting ? "Creando entorno…" : "Confirmar y entrar al Dashboard"}
         </Button>
       </div>
     </div>

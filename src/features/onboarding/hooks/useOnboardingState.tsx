@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import type { AnimalClass, Purpose, Subtype, WizardStep, WorkspaceDraft } from "../lib/types";
 import { requiresSubtype } from "../lib/onboardingOptions";
 import type { PreloadedSpeciesId } from "@/lib/species-config";
+import { ACTIVE_WORKSPACE_KEY, createWorkspaceFromDraft, type WorkspaceRow } from "@/lib/workspace";
 
 export const PENDING_WORKSPACE_KEY = "biotrack_pending_workspace";
 
@@ -39,7 +40,8 @@ interface OnboardingContextValue extends Omit<OnboardingState, never> {
   totalSteps: number;
   progressIndex: number;
   buildDraft: () => WorkspaceDraft;
-  confirm: () => WorkspaceDraft;
+  confirm: () => Promise<WorkspaceRow>;
+  isSubmitting: boolean;
 }
 
 const Ctx = createContext<OnboardingContextValue | null>(null);
@@ -136,10 +138,20 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     };
   }, [state]);
 
-  const confirm = useCallback((): WorkspaceDraft => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const confirm = useCallback(async (): Promise<WorkspaceRow> => {
     const draft = buildDraft();
     localStorage.setItem(PENDING_WORKSPACE_KEY, JSON.stringify(draft));
-    return draft;
+    setIsSubmitting(true);
+    try {
+      const ws = await createWorkspaceFromDraft(draft);
+      localStorage.setItem(ACTIVE_WORKSPACE_KEY, ws.id);
+      localStorage.removeItem(PENDING_WORKSPACE_KEY);
+      return ws;
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [buildDraft]);
 
   const value: OnboardingContextValue = {
@@ -158,6 +170,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     progressIndex,
     buildDraft,
     confirm,
+    isSubmitting,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

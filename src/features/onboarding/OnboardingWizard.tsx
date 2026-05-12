@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -12,11 +13,17 @@ import WorkspaceSummary from "./steps/WorkspaceSummary";
 
 function WizardInner() {
   const navigate = useNavigate();
-  const { currentStep, next, back, canAdvance, totalSteps, progressIndex, confirm } = useOnboardingState();
+  const { currentStep, next, back, canAdvance, totalSteps, progressIndex, confirm, isSubmitting } =
+    useOnboardingState();
 
-  const handleConfirm = () => {
-    confirm();
-    navigate("/dashboard?onboarding_complete=true", { replace: true });
+  const handleConfirm = async () => {
+    try {
+      await confirm();
+      navigate("/dashboard?onboarding_complete=true", { replace: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo crear el entorno.";
+      toast.error(msg);
+    }
   };
 
   const isFirst = currentStep === 1;
