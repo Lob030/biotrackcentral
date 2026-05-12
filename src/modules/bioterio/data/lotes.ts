@@ -6,9 +6,10 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { lotesKeys } from "@/lib/queryKeys";
-import type { LoteRow } from "@/lib/types";
+import type { LoteRow } from "@/shared/types";
+import { bioterioTypes } from "../types";
 
-export type LoteListRow = LoteRow & {
+export type LoteListRow = bioterioTypes.LoteRow & {
   lineas_geneticas?: { nombre: string; color_etiqueta: string } | null;
   cajas?: { codigo: string } | null;
 };
