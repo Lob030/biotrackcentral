@@ -14,111 +14,49 @@ export type Database = {
   }
   public: {
     Tables: {
-      ai_aliases: {
+      ai_action_logs: {
         Row: {
-          alias: string
           created_at: string
-          entity_ref: string
-          entity_type: string
+          error: string | null
           id: string
-          organization_id: string
+          plan: Json
+          prompt: string
+          result: Json
+          status: string
           updated_at: string
+          user_id: string
+          workspace_id: string
         }
         Insert: {
-          alias: string
           created_at?: string
-          entity_ref: string
-          entity_type: string
+          error?: string | null
           id?: string
-          organization_id: string
+          plan?: Json
+          prompt: string
+          result?: Json
+          status?: string
           updated_at?: string
+          user_id: string
+          workspace_id: string
         }
         Update: {
-          alias?: string
           created_at?: string
-          entity_ref?: string
-          entity_type?: string
+          error?: string | null
           id?: string
-          organization_id?: string
+          plan?: Json
+          prompt?: string
+          result?: Json
+          status?: string
           updated_at?: string
+          user_id?: string
+          workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "ai_aliases_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: "ai_action_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ai_journal_runs: {
-        Row: {
-          created_at: string
-          id: string
-          invalid: Json
-          note: string
-          operations: Json
-          organization_id: string
-          results: Json
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          invalid?: Json
-          note: string
-          operations?: Json
-          organization_id: string
-          results?: Json
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          invalid?: Json
-          note?: string
-          operations?: Json
-          organization_id?: string
-          results?: Json
-          user_id?: string
-        }
-        Relationships: []
-      }
-      ai_telemetry_events: {
-        Row: {
-          created_at: string
-          duration_ms: number | null
-          event_type: string
-          id: string
-          metadata: Json
-          organization_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          duration_ms?: number | null
-          event_type: string
-          id?: string
-          metadata?: Json
-          organization_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          duration_ms?: number | null
-          event_type?: string
-          id?: string
-          metadata?: Json
-          organization_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_telemetry_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
