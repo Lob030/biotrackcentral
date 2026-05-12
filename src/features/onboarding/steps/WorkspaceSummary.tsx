@@ -46,8 +46,8 @@ export default function WorkspaceSummary({ onConfirm }: Props) {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={onConfirm} size="lg">
-          Confirmar y entrar al Dashboard
+        <Button onClick={onConfirm} size="lg" disabled={isSubmitting}>
+          {isSubmitting ? "Creando entorno…" : "Confirmar y entrar al Dashboard"}
         </Button>
       </div>
     </div>
