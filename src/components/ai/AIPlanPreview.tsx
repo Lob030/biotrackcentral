@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { PlanResponse } from "@/lib/ai/client";
 import { DESTRUCTIVE_INTENTS, INTENT_LABELS, type IntentName } from "@/lib/ai/schemas";
 
