@@ -298,6 +298,7 @@ export default function Admin() {
             </div>
           ))}
         </div>
+      </section>
     </div>
   );
 }
