@@ -40,7 +40,8 @@ interface OnboardingContextValue extends Omit<OnboardingState, never> {
   totalSteps: number;
   progressIndex: number;
   buildDraft: () => WorkspaceDraft;
-  confirm: () => WorkspaceDraft;
+  confirm: () => Promise<WorkspaceRow>;
+  isSubmitting: boolean;
 }
 
 const Ctx = createContext<OnboardingContextValue | null>(null);
