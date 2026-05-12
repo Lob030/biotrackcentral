@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check } from "lucide-react";
+import { useEffect } from "react";
 import { useOnboardingState } from "../hooks/useOnboardingState";
 import { SPECIES_PLACEHOLDER } from "../lib/onboardingOptions";
 import { PRELOADED_SPECIES } from "@/lib/species-config";
