@@ -24,7 +24,7 @@ interface Props {
 }
 
 export default function AIPlanPreview({ plan, open, onClose, onConfirm, isExecuting }: Props) {
-  const confirm = useConfirmDialog();
+  const confirm = useConfirm();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
