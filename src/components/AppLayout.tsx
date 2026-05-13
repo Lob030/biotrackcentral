@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
-import AIAgentBar from "./ai/AIAgentBar";
+import OperationalAssistantBar from "@/modules/bioterio/ai/components/OperationalAssistantBar";
 
 export default function AppLayout() {
   return (
@@ -16,7 +16,7 @@ export default function AppLayout() {
             <Outlet />
           </main>
         </div>
-        <AIAgentBar />
+        <OperationalAssistantBar />
       </div>
     </SidebarProvider>
   );

@@ -1,114 +1,271 @@
+// Operational AI Assistant — single-op planner.
+// Gemini 2.5 Flash, tool-calling, no execution.
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
-import { IntentSchemas, ALL_INTENTS, type IntentName } from "../_shared/ai-schemas.ts";
-import { resolveCajaByCodigo, resolveLineaByNombre, resolveLote, resolveCliente } from "../_shared/ai-resolve.ts";
+import { INTENT_NAMES, IntentSchemas, TOOL_PARAMS, type IntentName } from "../_shared/bioterio-ai-schemas.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
+const SYSTEM_PROMPT = `You are an Operational Copilot Parser for the BioTrack Central Bioterio system.
+You are NOT a chatbot, assistant, or agent. Your ONLY responsibility:
+1. detect ONE operational intent
+2. resolve operational arguments
+3. emit a SINGLE tool call
+
+Allowed intents (closed set): ${INTENT_NAMES.join(", ")}.
+
+NEVER:
+- chain operations (1 command = 1 intent)
+- guess ambiguous entities — emit needs_disambiguation
+- assume missing required params — emit needs_disambiguation
+- output prose, markdown, reasoning, or commentary
+- invent intents outside the catalog — emit invalid_operation
+
+Always set "confidence": high | medium | low. If low, prefer needs_disambiguation.
+Tool calls ONLY.`;
+
 const BodySchema = z.object({
-  prompt: z.string().trim().min(2).max(4000),
+  prompt: z.string().trim().min(2).max(2000),
   workspace_id: z.string().uuid(),
 });
 
-const SYSTEM_PROMPT = `Eres un asistente operativo para un bioterio. Convierte la nota del usuario en una lista de operaciones discretas usando la herramienta "emit_operations". Cada operación debe ser uno de: ${ALL_INTENTS.join(", ")}. Si una operación no encaja exactamente en un schema, omítela. Las fechas siempre en formato YYYY-MM-DD. Las especies válidas: ASF, Raton, Rata. No inventes datos. Si nada es claro, devuelve operations: [].`;
-
-const tool = {
-  type: "function",
-  function: {
-    name: "emit_operations",
-    description: "Emit one or more discrete operations parsed from the user note.",
-    parameters: {
-      type: "object",
-      properties: {
-        operations: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              intent: { type: "string", enum: ALL_INTENTS },
-              payload: { type: "object" },
-            },
-            required: ["intent", "payload"],
+function buildTools() {
+  const intentTools = INTENT_NAMES.map((name) => ({
+    type: "function" as const,
+    function: { name, description: `Operational intent: ${name}`, parameters: TOOL_PARAMS[name] },
+  }));
+  const meta = [
+    {
+      type: "function" as const,
+      function: {
+        name: "needs_disambiguation",
+        description: "Emit when the command references entities ambiguously or omits required parameters.",
+        parameters: {
+          type: "object",
+          properties: {
+            reason: { type: "string" },
+            field: { type: "string", description: "Which field needs clarification (e.g. lotCode)." },
           },
+          required: ["reason"],
         },
       },
-      required: ["operations"],
     },
-  },
-};
+    {
+      type: "function" as const,
+      function: {
+        name: "invalid_operation",
+        description: "Emit when the command does not map to any allowed intent.",
+        parameters: {
+          type: "object",
+          properties: { reason: { type: "string" } },
+          required: ["reason"],
+        },
+      },
+    },
+  ];
+  return [...intentTools, ...meta];
+}
 
-async function dryRun(
-  supabase: SupabaseClient,
+async function resolveLote(sb: SupabaseClient, ref: string) {
+  const { data } = await sb.from("lotes").select("id, codigo, cantidad_actual, caja_id, especie").ilike("codigo", ref);
+  return data ?? [];
+}
+async function resolveCaja(sb: SupabaseClient, ref: string) {
+  const { data } = await sb.from("cajas").select("id, codigo, capacidad").ilike("codigo", ref);
+  return data ?? [];
+}
+
+interface ResolveContext {
+  lotId?: string;
+  fromCageId?: string;
+  toCageId?: string;
+  cageId?: string;
+  maleLotId?: string;
+  femaleLotId?: string;
+  litterLotId?: string;
+  breedingGroupId?: string;
+}
+
+interface ResolveResult {
+  resolved: ResolveContext;
+  candidates: Array<{ field: string; options: Array<{ id: string; label: string; hint?: string }> }>;
+  warnings: string[];
+  validationErrors: string[];
+  preview: { lines: string[]; affectedLots: unknown[]; affectedCages: unknown[] };
+}
+
+async function buildPreview(
+  sb: SupabaseClient,
   intent: IntentName,
-  payload: Record<string, unknown>,
-): Promise<{ preview: string; warnings: string[] }> {
-  const w: string[] = [];
+  args: Record<string, unknown>,
+): Promise<ResolveResult> {
+  const result: ResolveResult = {
+    resolved: {},
+    candidates: [],
+    warnings: [],
+    validationErrors: [],
+    preview: { lines: [], affectedLots: [], affectedCages: [] },
+  };
+
+  const resolveLotByCode = async (field: string, code: string): Promise<string | null> => {
+    const matches = await resolveLote(sb, code);
+    if (matches.length === 0) {
+      result.validationErrors.push(`Lote no encontrado: ${code}`);
+      return null;
+    }
+    if (matches.length > 1) {
+      result.candidates.push({
+        field,
+        options: matches.map((m) => ({
+          id: m.id,
+          label: m.codigo ?? m.id,
+          hint: `${m.especie} · ${m.cantidad_actual ?? 0} animales`,
+        })),
+      });
+      return null;
+    }
+    return matches[0].id;
+  };
+
+  const resolveCageByCode = async (field: string, code: string): Promise<{ id: string; capacity: number | null; codigo: string } | null> => {
+    const matches = await resolveCaja(sb, code);
+    if (matches.length === 0) {
+      result.validationErrors.push(`Caja no encontrada: ${code}`);
+      return null;
+    }
+    if (matches.length > 1) {
+      result.candidates.push({
+        field,
+        options: matches.map((m) => ({ id: m.id, label: m.codigo, hint: `cap ${m.capacidad ?? "?"}` })),
+      });
+      return null;
+    }
+    return { id: matches[0].id, capacity: matches[0].capacidad, codigo: matches[0].codigo };
+  };
+
   switch (intent) {
-    case "crear_linea_genetica":
-      return { preview: `Crear línea "${(payload as any).nombre}" (${(payload as any).especie})`, warnings: w };
-    case "editar_linea_genetica": {
-      const r = await resolveLineaByNombre(supabase, (payload as any).ref);
-      if (!r) throw new Error(`Línea genética no encontrada: ${(payload as any).ref}`);
-      return { preview: `Editar línea "${r.nombre}"`, warnings: w };
-    }
-    case "crear_caja":
-      return { preview: `Crear ${(payload as any).codigos.length} caja(s): ${(payload as any).codigos.join(", ")} (uso ${(payload as any).uso})`, warnings: w };
-    case "editar_caja": {
-      const r = await resolveCajaByCodigo(supabase, (payload as any).ref);
-      if (!r) throw new Error(`Caja no encontrada: ${(payload as any).ref}`);
-      return { preview: `Editar caja "${r.codigo}"`, warnings: w };
-    }
-    case "crear_lote": {
-      if ((payload as any).caja) {
-        const c = await resolveCajaByCodigo(supabase, (payload as any).caja);
-        if (!c) w.push(`Caja "${(payload as any).caja}" no existe; se creará el lote sin caja.`);
+    case "MOVE_LOT": {
+      const a = args as { lotCode: string; targetCageCode: string; quantity?: number };
+      const lotMatches = await resolveLote(sb, a.lotCode);
+      if (lotMatches.length === 1) {
+        result.resolved.lotId = lotMatches[0].id;
+        result.resolved.fromCageId = lotMatches[0].caja_id ?? undefined;
+        const cage = await resolveCageByCode("targetCageCode", a.targetCageCode);
+        if (cage) {
+          result.resolved.toCageId = cage.id;
+          const moveQty = a.quantity ?? lotMatches[0].cantidad_actual ?? 0;
+          result.preview.lines.push(`Lote ${lotMatches[0].codigo}: mover ${moveQty} animales → caja ${cage.codigo}`);
+          if (cage.capacity != null) {
+            result.preview.lines.push(`Caja ${cage.codigo}: capacidad ${cage.capacity} (verificar ocupación al ejecutar)`);
+          }
+        }
+      } else if (lotMatches.length > 1) {
+        result.candidates.push({
+          field: "lotCode",
+          options: lotMatches.map((m) => ({ id: m.id, label: m.codigo ?? m.id, hint: `${m.cantidad_actual ?? 0} animales` })),
+        });
+      } else {
+        result.validationErrors.push(`Lote no encontrado: ${a.lotCode}`);
       }
-      if ((payload as any).linea_genetica) {
-        const l = await resolveLineaByNombre(supabase, (payload as any).linea_genetica);
-        if (!l) w.push(`Línea "${(payload as any).linea_genetica}" no existe; se creará sin línea.`);
+      break;
+    }
+    case "ASSIGN_LOT_TO_CAGE": {
+      const a = args as { lotCode: string; cageCode: string };
+      const lotId = await resolveLotByCode("lotCode", a.lotCode);
+      const cage = await resolveCageByCode("cageCode", a.cageCode);
+      if (lotId) result.resolved.lotId = lotId;
+      if (cage) result.resolved.cageId = cage.id;
+      if (lotId && cage) result.preview.lines.push(`Asignar lote a caja ${cage.codigo}`);
+      break;
+    }
+    case "REGISTER_MORTALITY": {
+      const a = args as { lotCode: string; quantity: number };
+      const matches = await resolveLote(sb, a.lotCode);
+      if (matches.length === 1) {
+        const lot = matches[0];
+        result.resolved.lotId = lot.id;
+        const current = lot.cantidad_actual ?? 0;
+        const after = Math.max(0, current - a.quantity);
+        result.preview.lines.push(`Lote ${lot.codigo}: cantidad ${current} → ${after}`);
+        result.preview.lines.push(`Registrar ${a.quantity} mortalidad(es)`);
+        if (a.quantity > current) {
+          result.validationErrors.push(`La cantidad (${a.quantity}) excede el stock actual (${current}).`);
+        }
+      } else if (matches.length > 1) {
+        result.candidates.push({
+          field: "lotCode",
+          options: matches.map((m) => ({ id: m.id, label: m.codigo ?? m.id, hint: `${m.cantidad_actual ?? 0} animales` })),
+        });
+      } else {
+        result.validationErrors.push(`Lote no encontrado: ${a.lotCode}`);
       }
-      return { preview: `Crear lote "${(payload as any).codigo}" (${(payload as any).especie}, nacido ${(payload as any).fecha_nacimiento})`, warnings: w };
+      break;
     }
-    case "editar_lote": {
-      const l = await resolveLote(supabase, (payload as any).ref);
-      if (!l) throw new Error(`Lote no encontrado: ${(payload as any).ref}`);
-      return { preview: `Editar lote "${l.codigo ?? l.id}"`, warnings: w };
-    }
-    case "registrar_mortalidad": {
-      let lote = (payload as any).lote ? await resolveLote(supabase, (payload as any).lote) : null;
-      if ((payload as any).lote && !lote) throw new Error(`Lote no encontrado: ${(payload as any).lote}`);
-      if (lote && lote.cantidad_actual !== null && (payload as any).cantidad > lote.cantidad_actual) {
-        w.push(`La cantidad (${(payload as any).cantidad}) excede el stock actual (${lote.cantidad_actual}).`);
+    case "SUBDIVIDE_LOT": {
+      const a = args as { lotCode: string; subdivisions: Array<{ sex: string; quantity: number; codeSuffix?: string }> };
+      const matches = await resolveLote(sb, a.lotCode);
+      if (matches.length === 1) {
+        const lot = matches[0];
+        result.resolved.lotId = lot.id;
+        const total = a.subdivisions.reduce((s, x) => s + x.quantity, 0);
+        const current = lot.cantidad_actual ?? 0;
+        result.preview.lines.push(
+          `Subdividir ${lot.codigo} (${current}) → ${a.subdivisions.map((s) => `${s.codeSuffix ?? s.sex}:${s.quantity}`).join(" + ")}`,
+        );
+        if (total > current) {
+          result.validationErrors.push(`Total subdividido (${total}) excede stock (${current}).`);
+        }
+      } else if (matches.length > 1) {
+        result.candidates.push({
+          field: "lotCode",
+          options: matches.map((m) => ({ id: m.id, label: m.codigo ?? m.id })),
+        });
+      } else {
+        result.validationErrors.push(`Lote no encontrado: ${a.lotCode}`);
       }
-      return { preview: `Registrar ${(payload as any).cantidad} mortalidad${lote ? ` en lote "${lote.codigo ?? lote.id}"` : ` por caja "${(payload as any).caja}"`}`, warnings: w };
+      break;
     }
-    case "trasladar_animales": {
-      const l = await resolveLote(supabase, (payload as any).lote_origen);
-      if (!l) throw new Error(`Lote origen no encontrado: ${(payload as any).lote_origen}`);
-      const c = await resolveCajaByCodigo(supabase, (payload as any).caja_destino);
-      if (!c) throw new Error(`Caja destino no encontrada: ${(payload as any).caja_destino}`);
-      return { preview: `Trasladar lote "${l.codigo ?? l.id}" a caja "${c.codigo}"`, warnings: w };
-    }
-    case "dividir_lote": {
-      const l = await resolveLote(supabase, (payload as any).lote_origen);
-      if (!l) throw new Error(`Lote origen no encontrado: ${(payload as any).lote_origen}`);
-      const total = ((payload as any).movimientos as Array<{ cantidad: number }>).reduce((s, m) => s + m.cantidad, 0);
-      if (l.cantidad_actual !== null && total > l.cantidad_actual) {
-        w.push(`Total a mover (${total}) excede stock actual (${l.cantidad_actual}).`);
+    case "CREATE_LOT": {
+      const a = args as { speciesId: string; quantity: number; cageCode?: string };
+      result.preview.lines.push(`Crear lote: ${a.speciesId}, ${a.quantity} animales`);
+      if (a.cageCode) {
+        const cage = await resolveCageByCode("cageCode", a.cageCode);
+        if (cage) result.resolved.cageId = cage.id;
       }
-      return { preview: `Dividir lote "${l.codigo ?? l.id}" en ${(payload as any).movimientos.length} movimiento(s)`, warnings: w };
+      break;
     }
-    case "crear_cliente":
-      return { preview: `Crear cliente "${(payload as any).nombre}"`, warnings: w };
-    case "crear_pedido": {
-      const c = await resolveCliente(supabase, (payload as any).cliente);
-      if (!c) throw new Error(`Cliente no encontrado: ${(payload as any).cliente}`);
-      return { preview: `Crear pedido para "${c.nombre}" con ${(payload as any).items.length} línea(s)`, warnings: w };
+    case "CREATE_BREEDING_GROUP": {
+      const a = args as { maleLotCode: string; femaleLotCode: string; cageCode: string };
+      const m = await resolveLotByCode("maleLotCode", a.maleLotCode);
+      const f = await resolveLotByCode("femaleLotCode", a.femaleLotCode);
+      const cage = await resolveCageByCode("cageCode", a.cageCode);
+      if (m) result.resolved.maleLotId = m;
+      if (f) result.resolved.femaleLotId = f;
+      if (cage) result.resolved.cageId = cage.id;
+      if (m && f && cage) {
+        result.preview.lines.push(`Crear grupo reproductor en caja ${cage.codigo} (♂ ${a.maleLotCode} × ♀ ${a.femaleLotCode})`);
+      }
+      break;
+    }
+    case "REGISTER_LITTER": {
+      const a = args as { breedingGroupRef: string; litterSize: number; liveBirths: number };
+      result.warnings.push(`Resolución de grupo reproductor "${a.breedingGroupRef}" se hará al ejecutar.`);
+      result.preview.lines.push(`Registrar camada: ${a.litterSize} (${a.liveBirths} vivos)`);
+      break;
+    }
+    case "REGISTER_WEANING": {
+      const a = args as { litterLotCode: string; subdivisions: Array<{ sex: string; quantity: number }> };
+      const lotId = await resolveLotByCode("litterLotCode", a.litterLotCode);
+      if (lotId) result.resolved.litterLotId = lotId;
+      result.preview.lines.push(`Destetar ${a.litterLotCode}: ${a.subdivisions.map((s) => `${s.sex}:${s.quantity}`).join(", ")}`);
+      break;
     }
   }
+
+  return result;
 }
 
 Deno.serve(async (req) => {
@@ -131,13 +288,11 @@ Deno.serve(async (req) => {
     }
     const { prompt, workspace_id } = body.data;
 
-    // Validate workspace ownership via RLS
     const { data: ws } = await supabase.from("workspaces").select("id").eq("id", workspace_id).maybeSingle();
     if (!ws) {
-      return new Response(JSON.stringify({ error: "Workspace inválido o sin acceso" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Workspace inválido" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Call Lovable AI Gateway
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -145,60 +300,124 @@ Deno.serve(async (req) => {
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Fecha de hoy: ${new Date().toISOString().slice(0, 10)}\n\nNota: ${prompt}` },
+          { role: "user", content: `Today: ${new Date().toISOString().slice(0, 10)}\n\nCommand: ${prompt}` },
         ],
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: "emit_operations" } },
+        tools: buildTools(),
+        tool_choice: "required",
       }),
     });
     if (!aiResp.ok) {
-      if (aiResp.status === 429) return new Response(JSON.stringify({ error: "Límite de uso de IA alcanzado, intenta más tarde." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (aiResp.status === 402) return new Response(JSON.stringify({ error: "Sin créditos de IA. Agrega fondos en Settings > Workspace > Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (aiResp.status === 429) return new Response(JSON.stringify({ error: "Límite de uso de IA alcanzado." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (aiResp.status === 402) return new Response(JSON.stringify({ error: "Sin créditos de IA." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const t = await aiResp.text();
-      return new Response(JSON.stringify({ error: `IA gateway error: ${t.slice(0, 200)}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: `IA gateway: ${t.slice(0, 200)}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const aiData = await aiResp.json();
     const toolCall = aiData?.choices?.[0]?.message?.tool_calls?.[0];
-    let parsedOps: Array<{ intent: string; payload: Record<string, unknown> }> = [];
-    try {
-      const args = JSON.parse(toolCall?.function?.arguments ?? "{}");
-      parsedOps = Array.isArray(args.operations) ? args.operations : [];
-    } catch (_) { /* ignore */ }
+    const planId = crypto.randomUUID();
 
-    const operations: Array<{ id: string; intent: string; payload: Record<string, unknown>; preview: string; warnings: string[] }> = [];
-    const invalid: Array<{ id: string; intent?: string; error: string }> = [];
-
-    for (const op of parsedOps) {
-      const id = crypto.randomUUID();
-      const intent = op.intent as IntentName;
-      const schema = IntentSchemas[intent];
-      if (!schema) { invalid.push({ id, intent: op.intent, error: "Intent no soportado" }); continue; }
-      const parsed = schema.safeParse(op.payload);
-      if (!parsed.success) { invalid.push({ id, intent, error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }); continue; }
-      try {
-        const { preview, warnings } = await dryRun(supabase, intent, parsed.data as Record<string, unknown>);
-        operations.push({ id, intent, payload: parsed.data as Record<string, unknown>, preview, warnings });
-      } catch (e) {
-        invalid.push({ id, intent, error: e instanceof Error ? e.message : "Error de validación" });
-      }
+    if (!toolCall) {
+      await supabase.from("ai_action_logs").insert({
+        id: planId, user_id: userId, workspace_id, prompt,
+        plan: { status: "invalid", reason: "Sin tool call del modelo" },
+        status: "invalid",
+      });
+      return new Response(JSON.stringify({ planId, status: "invalid", reason: "El modelo no produjo una operación." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const planId = crypto.randomUUID();
+    const toolName = toolCall.function?.name as string;
+    let toolArgs: Record<string, unknown> = {};
+    try { toolArgs = JSON.parse(toolCall.function?.arguments ?? "{}"); } catch { /* ignore */ }
+
+    if (toolName === "needs_disambiguation") {
+      const payload = { planId, status: "needs_disambiguation" as const, reason: String(toolArgs.reason ?? "Aclaración requerida") };
+      await supabase.from("ai_action_logs").insert({
+        id: planId, user_id: userId, workspace_id, prompt,
+        plan: { ...payload, raw: toolArgs }, status: "needs_disambiguation",
+      });
+      return new Response(JSON.stringify(payload), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (toolName === "invalid_operation") {
+      const payload = { planId, status: "invalid" as const, reason: String(toolArgs.reason ?? "Operación no permitida") };
+      await supabase.from("ai_action_logs").insert({
+        id: planId, user_id: userId, workspace_id, prompt,
+        plan: { ...payload, raw: toolArgs }, status: "invalid",
+      });
+      return new Response(JSON.stringify(payload), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (!INTENT_NAMES.includes(toolName as IntentName)) {
+      const payload = { planId, status: "invalid" as const, reason: `Intent no permitido: ${toolName}` };
+      await supabase.from("ai_action_logs").insert({
+        id: planId, user_id: userId, workspace_id, prompt,
+        plan: payload, status: "invalid",
+      });
+      return new Response(JSON.stringify(payload), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const intent = toolName as IntentName;
+    const confidence = (toolArgs.confidence as string) ?? "medium";
+    const schema = IntentSchemas[intent];
+    const parsed = schema.safeParse(toolArgs);
+    if (!parsed.success) {
+      const payload = {
+        planId, status: "invalid" as const,
+        reason: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+      };
+      await supabase.from("ai_action_logs").insert({
+        id: planId, user_id: userId, workspace_id, prompt,
+        plan: { ...payload, raw: toolArgs }, status: "invalid",
+      });
+      return new Response(JSON.stringify(payload), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const args = parsed.data as Record<string, unknown>;
+    const ctx = await buildPreview(supabase, intent, args);
+
+    if (ctx.candidates.length > 0) {
+      const payload = {
+        planId, status: "needs_disambiguation" as const,
+        reason: "Se encontraron múltiples coincidencias.",
+        candidates: ctx.candidates,
+      };
+      await supabase.from("ai_action_logs").insert({
+        id: planId, user_id: userId, workspace_id, prompt,
+        plan: { ...payload, intent, args, confidence }, status: "needs_disambiguation",
+      });
+      return new Response(JSON.stringify(payload), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const operation = {
+      id: crypto.randomUUID(),
+      intent,
+      args: { ...args, _resolved: ctx.resolved },
+      confidence,
+      preview: ctx.preview,
+      warnings: ctx.warnings,
+      validationErrors: ctx.validationErrors,
+    };
+
     await supabase.from("ai_action_logs").insert({
-      id: planId,
-      user_id: userId,
-      workspace_id,
-      prompt,
-      plan: { operations, invalid },
+      id: planId, user_id: userId, workspace_id, prompt,
+      plan: {
+        intent, args, confidence,
+        warnings: ctx.warnings,
+        validation_errors: ctx.validationErrors,
+        preview_snapshot: ctx.preview,
+        operational_context: { workspace_id },
+      },
       status: "planned",
     });
 
-    return new Response(JSON.stringify({ plan_id: planId, operations, invalid }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ planId, status: "ok", operation }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("ai-plan error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
