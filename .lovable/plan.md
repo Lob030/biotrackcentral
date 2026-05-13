@@ -1,84 +1,148 @@
-# Reemplazo del Copiloto IA por Agente Gemini con Human-in-the-Loop
+# Operational AI Assistant MVP
 
-## Resumen
-Eliminamos por completo el copiloto antiguo (`AICommandBar`, edge function `ai-command`, tablas `ai_aliases`, `ai_journal_runs`, `ai_telemetry_events`, página `CopilotAnalytics`, `AIAliasesManager` en Admin) y lo reemplazamos por un nuevo flujo seguro **plan → preview → execute → audit** usando Gemini 2.5 Flash vía Lovable AI Gateway. Mantenemos el mismo alcance de operaciones (líneas, cajas, lotes, mortalidad, traslados, división, clientes, pedidos).
+A workflow-constrained operational copilot under `src/modules/bioterio/ai/`. Gemini parses one command into one intent; the runtime validates, previews, confirms, and executes via existing workflows. The AI never writes to the database.
 
-> Nota técnica: el proyecto es Vite/React, no Next.js. Las "rutas API" se implementan como **Supabase Edge Functions** (`ai-plan` y `ai-execute`), no como `src/app/api/.../route.ts`.
+## Pipeline
 
-## Fase 1 — Eliminación
+```text
+User command
+   ▼
+ai-plan edge fn  (Gemini 2.5 Flash, tool-calling, single-op)
+   ▼
+OperationalPlan JSON  { intent, args, confidence, status }
+   ▼
+Zod validation (shared schemas)
+   ▼
+Runtime validation layer (occupancy, qty, breeding, weaning…)
+   ▼
+Operational preview (human-readable deltas)
+   ▼
+User confirmation (extra confirm for destructive ops)
+   ▼
+executor.ts → existing *Workflow via useWorkflowActions
+   ▼
+Operational events → projection updates → dashboard refresh
+   ▼
+ai_action_logs row finalized (status, durations, snapshots)
+```
 
-### Archivos borrados
-- `src/components/ai/AICommandBar.tsx`
-- `src/components/ai/AIOperationBatchPreview.tsx`
-- `src/components/ai/AIOperationCard.tsx`
-- `src/components/ai/AIConfirmationDialog.tsx`
-- `src/components/ai/AIResultPreview.tsx`
-- `src/components/ai/AIValidationWarnings.tsx`
-- `src/components/ai/AIAliasesManager.tsx`
-- `src/data/aiCommand.ts`
-- `src/pages/CopilotAnalytics.tsx`
-- `supabase/functions/ai-command/` (carpeta completa, incluye handlers)
+## Hard rules (architectural)
 
-### Edits
-- `src/components/AppLayout.tsx`: quitar import y render de `<AICommandBar/>`, montar nuevo `<AIAgentBar/>`.
-- `src/App.tsx`: eliminar lazy `CopilotAnalytics` y la ruta `/admin/ai-analytics`.
-- `src/pages/Admin.tsx`: quitar import y render de `AIAliasesManager`.
+- **Model**: `google/gemini-2.5-flash` only. No preview models.
+- **Single operation**: 1 command = 1 intent, or `NEEDS_DISAMBIGUATION`, or `INVALID_OPERATION`.
+- **No memory**: each call gets only workspace + active instance + minimal projection context. No chat history.
+- **No autonomy**: AI emits tool calls only; never mutates data; never executes workflows.
+- **Allowed intents (closed set)**: `CREATE_LOT`, `SUBDIVIDE_LOT`, `MOVE_LOT`, `ASSIGN_LOT_TO_CAGE`, `REGISTER_MORTALITY`, `CREATE_BREEDING_GROUP`, `REGISTER_LITTER`, `REGISTER_WEANING`.
+- **Disambiguation**: if multiple entities match a reference (e.g. multiple "ASF" lots), return `NEEDS_DISAMBIGUATION` with candidates — never guess.
+- **Confidence**: `high | medium | low`. `low` → forced disambiguation, never auto-preview.
+- **Execution lock**: global `isExecutingPlan` (Zustand store) disables submit + preview confirm; single-flight per tab; idempotency key per plan written to `ai_action_logs` to block double-submit across tabs.
+- **Validation is authoritative**: runtime checks override AI args. Invalid → blocked at preview, never executed.
 
-### Migración SQL (drop + create)
-- `DROP TABLE` de `ai_aliases`, `ai_journal_runs`, `ai_telemetry_events`.
-- `DELETE` deploy de la edge function `ai-command` mediante `supabase--delete_edge_functions`.
+## File layout
 
-## Fase 2 — Nuevo Agente
+```text
+src/modules/bioterio/ai/
+  index.ts
+  intents.ts                 # IntentName union, labels, DESTRUCTIVE set
+  schemas.ts                 # Zod per-intent arg schemas (client mirror)
+  resolver.ts                # code/name → entity (lot, cage); returns candidates[] for ambiguity
+  validation.ts              # occupancy, qty, breeding, weaning, subdivision rules
+  preview.ts                 # builds PlanPreview { affectedLots, affectedCages, deltas, warnings }
+  executor.ts                # OperationalPlan → useWorkflowActions call; updates ai_action_logs
+  client.ts                  # planAction(prompt) → calls ai-plan edge fn
+  state.ts                   # Zustand: isExecutingPlan, currentPlan
+  prompts/
+    systemPrompt.ts          # strict parser prompt (provided verbatim)
+    intentExamples.ts        # few-shot dataset
+  components/
+    OperationalAssistantBar.tsx     # ⌘K floating bar (replaces AIAgentBar)
+    OperationalPlanPreview.tsx      # human-readable preview modal
+    DisambiguationPicker.tsx        # candidate selector when NEEDS_DISAMBIGUATION
 
-### Tabla nueva `ai_action_logs`
-Campos de dominio: `user_id`, `workspace_id`, `prompt`, `plan` (jsonb), `status` (`planned`/`executed`/`failed`/`rejected`), `result` (jsonb), `error` (text). RLS: el usuario solo ve/inserta sus propias filas; `workspace_id` debe pertenecer al usuario (subquery a `workspaces`).
+supabase/functions/_shared/
+  bioterio-ai-schemas.ts     # Deno mirror of Zod schemas + tool definitions
 
-### Edge Function `ai-plan`
-1. Verifica JWT con `getClaims`.
-2. Recibe `{ prompt, workspace_id }`. Valida que `workspace_id` pertenece al usuario (`workspaces.user_id = auth.uid()`).
-3. Llama Gemini 2.5 Flash vía gateway con tool-calling forzado a un schema Zod estricto (mismo set que el copiloto anterior: `crear_linea_genetica`, `crear_caja`, `crear_lote`, `editar_*`, `registrar_mortalidad`, `trasladar_animales`, `dividir_lote`, `crear_cliente`, `crear_pedido`, etc.).
-4. Valida la salida con Zod (rechazo total si no encaja).
-5. **Dry-run**: para cada operación, simula contra la DB con cliente RLS del usuario (resolver refs, verificar existencia de caja/lote/línea, stock suficiente para mortalidad, capacidad de caja, etc.) y arma un `plan_id` (uuid) + lista de `operations` con `preview` (qué cambia exactamente) y `warnings`.
-6. Persiste el plan en `ai_action_logs` con `status='planned'`.
-7. Devuelve `{ plan_id, operations, warnings, invalid }` al cliente. **Nunca ejecuta.**
+supabase/functions/ai-plan/index.ts   # rewritten for single-op, Gemini 2.5 Flash
+supabase/functions/ai-execute/         # DELETED (deploy-delete + filesystem-delete)
+```
 
-### Edge Function `ai-execute`
-1. Verifica JWT.
-2. Recibe `{ plan_id, approved_operation_ids }`.
-3. Carga el plan desde `ai_action_logs` (debe pertenecer al usuario, `status='planned'`).
-4. Ejecuta solo las operaciones aprobadas, una por una, cada una a través del cliente Supabase con el JWT del usuario (RLS hace cumplir aislamiento). Cada operación llama un handler tipado (puerto del antiguo `handlers/`).
-5. Actualiza `ai_action_logs` con `status='executed'|'failed'`, `result` y `error`.
-6. Responde `{ results: [{ id, status, summary, error? }] }`.
+## Edge function `ai-plan`
 
-**Restricciones**:
-- IA no genera SQL. Solo emite payloads con un schema Zod cerrado.
-- Toda escritura usa el cliente Supabase del usuario (RLS), nunca service role.
-- `workspace_id` es inyectado server-side y validado en plan + execute.
+- POST `{ prompt, workspaceId, instanceId, context? }`.
+- Validates JWT, loads minimal context (active workspace, instance, lot/cage codes index for resolution hints — no full data dump).
+- Calls Lovable AI Gateway with `model: "google/gemini-2.5-flash"`, `tool_choice: "required"`, one tool per allowed intent + `needs_disambiguation` + `invalid_operation`.
+- Reads exactly one tool call. Validates args with Zod (deno mirror). Resolves refs.
+- Returns one of:
+  - `{ status: "ok", operation: { id, intent, args, confidence, preview, warnings } }`
+  - `{ status: "needs_disambiguation", reason, candidates: [{ field, options: [...] }] }`
+  - `{ status: "invalid", reason }`
+- Writes `ai_action_logs` row with `status='planned'`, `intent`, `confidence`, `preview_snapshot`, `operational_context`. No mutations beyond this audit row.
 
-### Frontend nuevo
-- `src/lib/ai/schemas.ts` — schemas Zod compartidos (intent + payload por intent).
-- `src/lib/ai/types.ts` — tipos TS de plan y operación.
-- `src/lib/ai/client.ts` — `planAction(prompt)` / `executePlan(planId, opIds)` usando `supabase.functions.invoke`.
-- `src/components/ai/AIAgentBar.tsx` — botón flotante + dialog con textarea para el comando (reemplaza visualmente al copiloto anterior).
-- `src/components/ai/AIPlanPreview.tsx` — modal con tarjetas por operación, checkboxes, warnings, botón "Ejecutar seleccionadas" con confirmación.
-- Cuando `execute` termina, invalida queries (`lotes`, `cajas`, `lineas_geneticas`, `clientes`, `pedidos`) y muestra toast.
+## Client execution
 
-### Orden de ejecución
-1. **Migración SQL** (drop tablas viejas + crear `ai_action_logs` con RLS) — requiere aprobación.
-2. Borrar archivos del copiloto antiguo + ajustar `AppLayout`, `App.tsx`, `Admin.tsx`.
-3. Crear edge functions `ai-plan` y `ai-execute` (con handlers portados).
-4. Eliminar deploy de `ai-command`.
-5. Crear archivos frontend del nuevo agente y montar en `AppLayout`.
+- `executor.ts` consumes the approved plan, calls the matching `useWorkflowActions` method (1:1 mapping). Sequential awaits not needed (single op).
+- On result: updates `ai_action_logs` with `execution_status`, `execution_duration_ms`, `validation_errors`, `result`.
+- Uses existing `OperationSuccessToast`. Existing workflow query invalidations refresh the dashboard automatically.
 
-## Detalles técnicos clave
-- **Modelo IA**: `google/gemini-2.5-flash` via `https://ai.gateway.lovable.dev/v1/chat/completions` con `tools`/`tool_choice` para forzar JSON estructurado. Sin streaming (respuesta corta). `LOVABLE_API_KEY` ya disponible.
-- **Resolver refs**: las refs por nombre (caja "A1", línea "C57BL/6") se resuelven en el dry-run consultando con el cliente RLS; si una ref no existe, la operación se marca como `invalid` y no se incluye en el plan ejecutable.
-- **Workspace activo**: `useActiveWorkspace()` ya existe; `AIAgentBar` lo lee y lo envía en el body.
-- **Auditoría**: cada llamada a `ai-plan` y `ai-execute` deja una fila en `ai_action_logs` con prompt, plan completo, resultado y errores.
+## Validation rules (runtime, authoritative)
 
-## Validación post-implementación
-- Dashboard ya no muestra el botón "Copiloto" anterior; aparece el nuevo "Agente IA".
-- `/admin/ai-analytics` ya no existe; `Admin` no renderiza `AIAliasesManager`.
-- Build sin imports rotos.
-- Probar: "Crea cajas A1, A2 en zona A, uso engorda" → preview con 2 ops → aprobar → 2 cajas creadas → fila en `ai_action_logs`.
-- Probar: comando inválido ("borra la base de datos") → operación rechazada por schema, fila `status='planned'` con `invalid` poblado.
+| Intent | Rule |
+|---|---|
+| `MOVE_LOT` / `ASSIGN_LOT_TO_CAGE` | destination cage `availableSpace ≥ moved qty`; cage status not `cleaning` |
+| `REGISTER_MORTALITY` | `quantity ≤ lot.currentQuantity`; lot status active |
+| `SUBDIVIDE_LOT` | Σ subdivisions ≤ `lot.currentQuantity`; sex split coherent |
+| `CREATE_BREEDING_GROUP` | ≥1 male lot + ≥1 female lot; same species; lots active |
+| `REGISTER_LITTER` | breeding group exists & active |
+| `REGISTER_WEANING` | litter lot exists, not already weaned, has live births |
+| `CREATE_LOT` | required fields per `CreateLotWorkflowInput`; cage capacity if assigned |
+
+Hard validation errors → operation blocked in preview. Soft warnings → shown but executable.
+
+## Preview UX (human-readable, never raw JSON)
+
+- Header: intent label + confidence badge.
+- Body lines like:
+  - `Lot ASF-22 quantity: 40 → 35`
+  - `Cage B12 occupancy: 8/20 → 13/20`
+  - `Subdivision: ASF-22 (40) → ASF-22-M (22) + ASF-22-F (18)`
+- Warnings list (amber) and validation errors (red, blocks confirm).
+- Destructive ops (`REGISTER_MORTALITY`, `SUBDIVIDE_LOT`, `REGISTER_WEANING`) → second-step `confirm-dialog` ("type CONFIRM" or extra checkbox).
+- `NEEDS_DISAMBIGUATION` → `DisambiguationPicker` with candidate cards; user picks → re-runs plan with explicit code, no Gemini round-trip needed.
+
+## `ai_action_logs` enrichment
+
+Plan JSONB shape:
+```json
+{
+  "intent": "MOVE_LOT",
+  "args": { ... },
+  "confidence": "high",
+  "warnings": [...],
+  "validation_errors": [...],
+  "preview_snapshot": { "lots": [...], "cages": [...], "deltas": [...] },
+  "operational_context": { "workspaceId": "...", "instanceId": "..." },
+  "execution_status": "executed | failed | cancelled | invalid",
+  "execution_duration_ms": 412
+}
+```
+No schema migration needed (existing JSONB columns).
+
+## Migration / cleanup
+
+- Replace `<AIAgentBar />` with `<OperationalAssistantBar />` in `src/components/AppLayout.tsx`.
+- Delete `src/components/ai/AIAgentBar.tsx`, `AIPlanPreview.tsx`, `src/lib/ai/*`.
+- Delete `supabase/functions/ai-execute/` and call `supabase--delete_edge_functions(["ai-execute"])`.
+- Keep `ai_action_logs` table and its RLS unchanged.
+
+## Why this is safe
+
+- **Workflow-constrained**: Gemini's only output surface is the tool catalog mapping 1:1 to existing workflows → no invented operations, no DB freeform.
+- **Client-side execution via existing workflows**: every AI op flows through the same `*Workflow` functions the UI calls, so events, projections, and dashboard invalidations behave identically — no parallel write paths to keep in sync.
+- **Runtime validation is authoritative**: even a malformed Gemini output is rejected before reaching the executor; the AI cannot bypass occupancy/quantity/compatibility rules.
+- **Single-op + no memory + low temperature stable model** dramatically shrink the hallucination surface and make behavior reproducible across sessions.
+- **Disambiguation over guessing**: the assistant refuses to act on ambiguous references, eliminating the most common operational error class (wrong entity).
+- **Audit trail**: every plan + result lives in `ai_action_logs` with confidence, warnings, and snapshots, ready for future predictive systems to consume safely.
+
+## Open question
+
+Confirm preference for the disambiguation flow: (a) edge fn returns candidates and the UI re-submits an explicit prompt, vs. (b) UI calls a thin `resolve` endpoint that bypasses Gemini once the user picks. I propose (a) for simplicity in MVP.
