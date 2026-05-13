@@ -6,6 +6,9 @@
 import { registerModule } from '@/core/workspace/module-registry';
 import type { ModuleMetadata } from '@/shared/types/workspace';
 
+// Export validation module for operational integration testing
+export { operationalValidation, type ValidationResult } from './validation';
+
 /**
  * Bioterio Module Metadata
  * Defines all routes, navigation items, dashboard widgets, and capabilities

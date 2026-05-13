@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Activity, Layers, Package, FlaskConical, GitBranch, Calendar, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
+import { etapaActual, diasDesde, type Especie } from "@/modules/bioterio/lib/etapas";
 import { Badge } from "@/components/ui/badge";
-import { useLotesList } from "@/data/lotes";
-import { useCajasList } from "@/data/cajas";
+import { useLotesList } from "@/modules/bioterio/data/lotes";
+import { useCajasList } from "@/modules/bioterio/data/cajas";
 import { StatGridSkeleton, ListSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 

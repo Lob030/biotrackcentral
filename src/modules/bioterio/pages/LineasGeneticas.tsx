@@ -15,7 +15,7 @@ import {
   useLineasIndividuosCount,
   useUpsertLinea,
   useDeleteLinea,
-} from "@/data/lineasGeneticas";
+} from "@/modules/bioterio/data/lineasGeneticas";
 import type { LineaGeneticaRow } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 

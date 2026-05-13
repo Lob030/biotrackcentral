@@ -16,23 +16,23 @@ import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 
 // Eager — small + on the critical path
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./modules/bioterio/pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
 // Lazy — heavier or rarely-first-visit pages.
 // Code-splits the bundle so the initial load stays small.
 const LandingPage = lazy(() => import("./pages/LandingPage"));
-const LineasGeneticas = lazy(() => import("./pages/LineasGeneticas"));
-const Cajas = lazy(() => import("./pages/Cajas"));
-const Lotes = lazy(() => import("./pages/Lotes"));
-const LoteDetalle = lazy(() => import("./pages/LoteDetalle"));
-const Alertas = lazy(() => import("./pages/Alertas"));
-const Stock = lazy(() => import("./pages/Stock"));
+const LineasGeneticas = lazy(() => import("./modules/bioterio/pages/LineasGeneticas"));
+const Cajas = lazy(() => import("./modules/bioterio/pages/Cajas"));
+const Lotes = lazy(() => import("./modules/bioterio/pages/Lotes"));
+const LoteDetalle = lazy(() => import("./modules/bioterio/pages/LoteDetalle"));
+const Alertas = lazy(() => import("./modules/bioterio/pages/Alertas"));
+const Stock = lazy(() => import("./modules/bioterio/pages/Stock"));
 const Admin = lazy(() => import("./pages/Admin"));
-const Clientes = lazy(() => import("./pages/Clientes"));
-const ClientePerfil = lazy(() => import("./pages/ClientePerfil"));
-const Pedidos = lazy(() => import("./pages/Pedidos"));
-const Ventas = lazy(() => import("./pages/Ventas"));
+const Clientes = lazy(() => import("./modules/bioterio/pages/Clientes"));
+const ClientePerfil = lazy(() => import("./modules/bioterio/pages/ClientePerfil"));
+const Pedidos = lazy(() => import("./modules/bioterio/pages/Pedidos"));
+const Ventas = lazy(() => import("./modules/bioterio/pages/Ventas"));
 const MasterPanel = lazy(() => import("./pages/MasterPanel"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 
