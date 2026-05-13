@@ -68,8 +68,8 @@ export async function logExecutionResult(
         executionStatus: payload.executionStatus,
         executionDurationMs: payload.executionDurationMs,
         validationErrors: payload.validationErrors ?? [],
-        result: payload.result ?? null,
-      },
+        result: (payload.result ?? null) as never,
+      } as never,
     })
     .eq("id", planId);
 }
