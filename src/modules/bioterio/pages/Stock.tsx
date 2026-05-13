@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ETAPAS, etapaActual, rangoDias, rangoPeso, type Especie } from "@/lib/etapas";
+import { ETAPAS, etapaActual, rangoDias, rangoPeso, type Especie } from "@/modules/bioterio/lib/etapas";
 import { Boxes, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ProyeccionDisponibilidad from "@/components/ProyeccionDisponibilidad";
-import { useLotesStock, lotesStockKey } from "@/data/lotes";
+import { useLotesStock, lotesStockKey } from "@/modules/bioterio/data/lotes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 

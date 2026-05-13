@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { clearErrorsOnDialogClose, optionalTrimmedString, requiredTrimmedString, toNullIfBlank } from "@/lib/form-utils";
 import { cn } from "@/lib/utils";
-import { useCajasList, useUpsertCaja, useDeleteCaja } from "@/data/cajas";
+import { useCajasList, useUpsertCaja, useDeleteCaja } from "@/modules/bioterio/data/cajas";
 import type { CajaRow } from "@/lib/types";
 import { CardGridSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";

@@ -13,10 +13,10 @@ import { Plus, Pencil, Trash2, Scissors, GitFork, Skull, DollarSign, ArrowRightL
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { Link } from "react-router-dom";
-import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
-import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
-import { useCajaOptions, useLineaGeneticaOptions } from "@/data/options";
-import { useLotesList } from "@/data/lotes";
+import { etapaActual, diasDesde, type Especie } from "@/modules/bioterio/lib/etapas";
+import EventoDialog, { type EventoTipo } from "@/modules/bioterio/components/EventoDialog";
+import { useCajaOptions, useLineaGeneticaOptions } from "@/modules/bioterio/data/options";
+import { useLotesList } from "@/modules/bioterio/data/lotes";
 import { invalidateLotes } from "@/lib/invalidations";
 import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";

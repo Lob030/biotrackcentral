@@ -14,8 +14,8 @@ import {
   Calendar,
   Layers,
 } from "lucide-react";
-import { etapaActual, diasDesde, type Especie } from "@/lib/etapas";
-import EventoDialog, { type EventoTipo } from "@/components/EventoDialog";
+import { etapaActual, diasDesde, type Especie } from "@/modules/bioterio/lib/etapas";
+import EventoDialog, { type EventoTipo } from "@/modules/bioterio/components/EventoDialog";
 
 const TIPO_META: Record<
   string,

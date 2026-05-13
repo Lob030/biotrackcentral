@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
-import { useClientesList, useUpsertCliente, useDeleteCliente } from "@/data/clientes";
+import { useClientesList, useUpsertCliente, useDeleteCliente } from "@/modules/bioterio/data/clientes";
 import type { ClienteRow } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
