@@ -228,7 +228,7 @@ export function subdivideLot(options: SubdivideLotOptions): {
     const childLot: Lot = {
       id: childId,
       code: childCode,
-      species: parentLot.species,
+      speciesId: parentLot.speciesId,
       strain: parentLot.strain,
       sex: subdivision.sex,
       initialQuantity: subdivision.quantity,
