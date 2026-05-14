@@ -1,13 +1,13 @@
 import { useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Activity, Layers, Package, FlaskConical, GitBranch, Calendar, ChevronRight } from "lucide-react";
+import { Activity, Layers, Package, FlaskConical, GitBranch, Calendar, ChevronRight, TrendingDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import { etapaActual, diasDesde, type Especie } from "@/modules/bioterio/lib/etapas";
 import { Badge } from "@/components/ui/badge";
 import { useLotesList } from "@/modules/bioterio/data/lotes";
 import { useCajasList } from "@/modules/bioterio/data/cajas";
 import { StatGridSkeleton, ListSkeleton } from "@/components/ui/list-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
+import { useInventorySnapshot } from "@/modules/bioterio/inventory/runtime/hooks";
 
 function StatCard({ icon: Icon, label, value, sublabel, iconClass }: any) {
   return (
@@ -26,9 +26,11 @@ function StatCard({ icon: Icon, label, value, sublabel, iconClass }: any) {
 
 export default function Dashboard() {
   const { profile } = useAuth();
+  const workspaceId = profile?.workspace_id || profile?.organization_id;
 
   const lotesQuery = useLotesList({ estado: "activo" });
   const cajasQuery = useCajasList();
+  const { snapshot } = useInventorySnapshot(workspaceId);
 
   const lotes = lotesQuery.data ?? [];
   const cajas = cajasQuery.data ?? [];
@@ -49,17 +51,6 @@ export default function Dashboard() {
     const cajasLibres = cajas.filter((c: any) => c.estado === "libre").length;
     const subLotes = lotes.filter((l: any) => l.lote_padre_id).length;
 
-    const porEspecie = (["ASF", "Raton", "Rata"] as const).map((esp) => {
-      const count = lotes
-        .filter((l: any) => l.especie === esp)
-        .reduce((s: number, l: any) => s + (l.cantidad_actual || 0), 0);
-      return {
-        especie: esp,
-        count,
-        pct: totalIndividuos ? Math.round((count / totalIndividuos) * 100) : 0,
-      };
-    });
-
     return {
       totalIndividuos,
       lotesNacimiento,
@@ -68,7 +59,6 @@ export default function Dashboard() {
       cajasOcupadas,
       cajasLibres,
       subLotes,
-      porEspecie,
     };
   }, [lotes, cajas]);
 
@@ -144,8 +134,8 @@ export default function Dashboard() {
               ) : (
                 <div className="divide-y divide-border/60">
                   {recientes.map((l: any) => {
-                    const dias = diasDesde(l.fecha_nacimiento);
-                    const etapa = etapaActual(l.especie as Especie, l.fecha_nacimiento);
+                    const dias = Math.floor((Date.now() - new Date(l.fecha_nacimiento).getTime()) / (1000 * 60 * 60 * 24));
+                    const etapa = l.species_size_classes?.name || "—";
                     return (
                       <div key={l.id} className="py-3 flex items-center justify-between gap-4 -mx-2 px-2 rounded-md transition-colors hover:bg-muted/30">
                         <div className="min-w-0 flex-1">
@@ -169,20 +159,52 @@ export default function Dashboard() {
             </div>
 
             <div className="glass-card p-5">
-              <h2 className="display-font text-lg font-semibold mb-4">Individuos por especie</h2>
-              <div className="space-y-4">
-                {stats.porEspecie.map((e) => (
-                  <div key={e.especie}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-sm">{e.especie}</span>
-                      <span className="text-xs text-muted-foreground">{e.count} ind · {e.pct}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                      <div className="h-full bg-gradient-primary transition-all duration-500" style={{ width: `${e.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="display-font text-lg font-semibold">Disponibilidad por clasificación</h2>
+                <Link to="/stock" className="text-sm text-primary hover:underline flex items-center gap-1">
+                  Detalle <ChevronRight className="h-4 w-4" />
+                </Link>
               </div>
+              {snapshot && snapshot.classificationStates.length > 0 ? (
+                <div className="space-y-3">
+                  {snapshot.classificationStates.map((state) => {
+                    const pct = snapshot.summary.totalAvailable
+                      ? Math.round((state.available / snapshot.summary.totalAvailable) * 100)
+                      : 0;
+                    const isLow = state.available > 0 && state.available <= 10;
+                    return (
+                      <div key={state.sizeClassId}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-medium text-sm truncate">
+                              {state.operationalName || state.speciesName}
+                            </span>
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 shrink-0">
+                              {state.sizeClassName}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isLow && <TrendingDown className="h-3 w-3 text-amber-500" />}
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {state.available} disp · {state.totalAnimals} total
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 ${isLow ? 'bg-amber-500' : 'bg-gradient-primary'}`}
+                            style={{ width: `${Math.max(2, pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Configura <Link to="/species" className="text-primary hover:underline">Perfiles de Especies</Link> para ver disponibilidad.
+                </p>
+              )}
             </div>
           </div>
         </>

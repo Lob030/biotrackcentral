@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { AnimalClass, Purpose, Subtype, WizardStep, WorkspaceDraft } from "../lib/types";
-import { requiresSubtype } from "../lib/onboardingOptions";
-import type { PreloadedSpeciesId } from "@/lib/species-config";
+import type { AnimalClass, Purpose, OperationType, WizardStep, WorkspaceDraft } from "../lib/types";
+import { requiresOperation } from "../lib/onboardingOptions";
+import type { PreloadedSpeciesId } from "@/modules/bioterio/lib/species-config";
 import { ACTIVE_WORKSPACE_KEY, createWorkspaceFromDraft, type WorkspaceRow } from "@/lib/workspace";
 
 export const PENDING_WORKSPACE_KEY = "biotrack_pending_workspace";
@@ -11,7 +11,7 @@ type SpeciesChoice = PreloadedSpeciesId | "custom" | null;
 interface OnboardingState {
   currentStep: WizardStep;
   purpose: Purpose | null;
-  subtype: Subtype | null;
+  operation: OperationType | null;
   animalClass: AnimalClass | null;
   speciesChoice: SpeciesChoice;
   customSpecies: string;
@@ -20,7 +20,7 @@ interface OnboardingState {
 const initial: OnboardingState = {
   currentStep: 1,
   purpose: null,
-  subtype: null,
+  operation: null,
   animalClass: null,
   speciesChoice: null,
   customSpecies: "",
@@ -28,7 +28,7 @@ const initial: OnboardingState = {
 
 interface OnboardingContextValue extends Omit<OnboardingState, never> {
   setPurpose: (p: Purpose) => void;
-  setSubtype: (s: Subtype) => void;
+  setOperation: (s: OperationType) => void;
   setAnimalClass: (a: AnimalClass) => void;
   setSpecies: (value: PreloadedSpeciesId | "custom", customText?: string) => void;
   setCustomSpeciesText: (t: string) => void;
@@ -47,13 +47,13 @@ interface OnboardingContextValue extends Omit<OnboardingState, never> {
 const Ctx = createContext<OnboardingContextValue | null>(null);
 
 function getOrder(purpose: Purpose | null): WizardStep[] {
-  return requiresSubtype(purpose) ? [1, 2, 3, 4, "summary"] : [1, 3, 4, "summary"];
+  return requiresOperation(purpose) ? [1, 2, "summary"] : [1, "summary"];
 }
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<OnboardingState>(initial);
 
-  const totalSteps = requiresSubtype(state.purpose) ? 4 : 3;
+  const totalSteps = requiresOperation(state.purpose) ? 2 : 1;
 
   const stepOrder = useMemo(() => getOrder(state.purpose), [state.purpose]);
   const progressIndex = Math.max(0, stepOrder.indexOf(state.currentStep));
@@ -63,10 +63,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       case 1:
         return state.purpose !== null;
       case 2:
-        return !!state.subtype;
-      case 3:
-        return !!state.animalClass;
-      case 4:
+        if (!state.operation) return false;
+        if (state.operation === 'Bioterio') {
+          return state.speciesChoice !== null && (state.speciesChoice !== 'custom' || state.customSpecies.trim().length > 0);
+        }
         return true;
       case "summary":
         return true;
@@ -77,11 +77,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setState((s) => ({
       ...s,
       purpose,
-      subtype: requiresSubtype(purpose) ? s.subtype : null,
+      operation: requiresOperation(purpose) ? s.operation : null,
     }));
   }, []);
 
-  const setSubtype = useCallback((subtype: Subtype) => setState((s) => ({ ...s, subtype })), []);
+  const setOperation = useCallback((operation: OperationType) => setState((s) => ({ ...s, operation })), []);
   const setAnimalClass = useCallback((animalClass: AnimalClass) => setState((s) => ({ ...s, animalClass })), []);
 
   const setSpecies = useCallback((value: PreloadedSpeciesId | "custom", customText?: string) => {
@@ -129,10 +129,16 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     } else {
       species = state.speciesChoice; // PreloadedSpeciesId | null
     }
+
+    let animalClass: AnimalClass = "Mamíferos"; // Default fallback
+    if (species === "insectos") {
+      animalClass = "Artrópodos";
+    }
+
     return {
       purpose: state.purpose!,
-      subtype: requiresSubtype(state.purpose) ? state.subtype : null,
-      animalClass: state.animalClass!,
+      operation: requiresOperation(state.purpose) ? state.operation : null,
+      animalClass,
       species,
       name: `Entorno ${new Date().toISOString()}`,
     };
@@ -157,7 +163,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const value: OnboardingContextValue = {
     ...state,
     setPurpose,
-    setSubtype,
+    setOperation,
     setAnimalClass,
     setSpecies,
     setCustomSpeciesText,

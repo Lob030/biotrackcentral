@@ -34,8 +34,8 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Pencil, Trash2, Plus, Settings2, Sparkles, Bell } from "lucide-react";
 import { toast } from "sonner";
-import { ALERTAS_SISTEMA } from "@/lib/alertasSistema";
-import { ETAPAS } from "@/lib/etapas";
+import { ALERTAS_SISTEMA } from "@/modules/bioterio/lib/alertasSistema";
+
 import { invalidateAlertasPersonalizadas, invalidateAlertasSistema } from "@/lib/invalidations";
 
 interface Props {
@@ -141,6 +141,24 @@ export default function AdministrarAlertasModal({ open, onOpenChange }: Props) {
       return data ?? [];
     },
     enabled: open,
+  });
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["all-species-profiles", orgId],
+    queryFn: async () => {
+      const { data } = await supabase.from("workspace_species_profiles").select("*").eq("workspace_id", orgId).eq("is_active", true);
+      return data ?? [];
+    },
+    enabled: !!orgId && open,
+  });
+
+  const { data: sizeClasses = [] } = useQuery({
+    queryKey: ["all-size-classes", orgId],
+    queryFn: async () => {
+      const { data } = await supabase.from("species_size_classes").select("*").eq("workspace_id", orgId).order("display_order");
+      return data ?? [];
+    },
+    enabled: !!orgId && open,
   });
 
   const { data: clientes = [] } = useQuery({
@@ -721,13 +739,13 @@ export default function AdministrarAlertasModal({ open, onOpenChange }: Props) {
                           <SelectValue placeholder="Selecciona una etapa" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(["ASF", "Raton", "Rata"] as const).flatMap((esp) =>
-                            ETAPAS[esp].map((e) => (
+                          {profiles.flatMap((p: any) =>
+                            sizeClasses.filter((c: any) => c.species_profile_id === p.id).map((e: any) => (
                               <SelectItem
-                                key={`${esp}-${e.nombre}`}
-                                value={`${esp}|${e.nombre}`}
+                                key={`${p.species_id}-${e.name}`}
+                                value={`${p.species_id}|${e.name}`}
                               >
-                                {esp} · {e.nombre}
+                                {p.operational_name || p.species_name} · {e.name}
                               </SelectItem>
                             )),
                           )}

@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ETAPAS, diasDesde, diasParaEtapa, type Especie } from "@/lib/etapas";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CalendarDays, RefreshCw, Zap } from "lucide-react";
-import { useLotesProyeccion, lotesProyeccionKey, type LoteProyeccionRow } from "@/data/lotes";
+import { useLotesProyeccion, lotesProyeccionKey, type LoteProyeccionRow } from "@/modules/bioterio/data/lotes";
 
-const ESPECIES: Especie[] = ["ASF", "Raton", "Rata"];
-const ESPECIE_LABEL: Record<Especie, string> = { ASF: "ASF", Raton: "Ratón", Rata: "Rata" };
+function diasDesde(fecha: string | Date): number {
+  const d = typeof fecha === "string" ? new Date(fecha) : fecha;
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 type LoteRow = LoteProyeccionRow;
 
@@ -54,9 +55,10 @@ function badgeFor(estado: Estado, dias: number | null, stock: number) {
   }
 }
 
-export default function ProyeccionDisponibilidad() {
+export default function ProyeccionDisponibilidad({ profiles, sizeClasses }: { profiles: any[], sizeClasses: any[] }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Especie>("Raton");
+  const primerProfile = profiles.length > 0 ? profiles[0].id : "";
+  const [tab, setTab] = useState<string>(primerProfile);
 
   const { data: lotes = [], isFetching, dataUpdatedAt } = useLotesProyeccion({
     refetchInterval: 5 * 60 * 1000,
@@ -64,24 +66,34 @@ export default function ProyeccionDisponibilidad() {
 
 
   const proyPorEspecie = useMemo(() => {
-    const result: Record<Especie, FilaProy[]> = { ASF: [], Raton: [], Rata: [] };
-    for (const especie of ESPECIES) {
-      const lotesEsp = lotes.filter((l) => l.especie === especie && l.fecha_nacimiento);
-      const etapas = ETAPAS[especie];
+    const result: Record<string, FilaProy[]> = {};
+    for (const p of profiles) {
+      // Resolve legacy species names just in case
+      const lotesEsp = lotes.filter((l) => {
+        let resolvedSpeciesId = l.especie?.toLowerCase();
+        if (resolvedSpeciesId === 'raton' || resolvedSpeciesId === 'ratón') resolvedSpeciesId = 'mouse';
+        if (resolvedSpeciesId === 'rata') resolvedSpeciesId = 'rat';
+        return (resolvedSpeciesId === p.species_id || l.species_id === p.species_id) && l.fecha_nacimiento;
+      });
+      
+      const clases = sizeClasses.filter((c: any) => c.species_profile_id === p.id);
 
-      result[especie] = etapas.map((e) => {
+      result[p.id] = clases.map((e) => {
+        const minDays = e.min_age_days ?? 0;
+        const maxDays = e.max_age_days ?? 9999;
+
         // Stock: lotes cuya etapa actual es esta etapa y con cantidad > 0
         const lotesEnEtapa = lotesEsp.filter((l) => {
           const dias = diasDesde(l.fecha_nacimiento!);
-          return dias >= e.diasMin && dias <= e.diasMax && (l.cantidad_actual ?? 0) > 0;
+          return dias >= minDays && dias <= maxDays && (l.cantidad_actual ?? 0) > 0;
         });
         const stock = lotesEnEtapa.reduce((s, l) => s + (l.cantidad_actual ?? 0), 0);
 
-        // Próximo lote: aún no llega a esta etapa (dias < diasMin), tomar el más avanzado
+        // Próximo lote: aún no llega a esta etapa (dias < minDays), tomar el más avanzado
         const candidatos = lotesEsp
           .filter((l) => (l.cantidad_actual ?? 0) > 0)
           .map((l) => ({ lote: l, diasActuales: diasDesde(l.fecha_nacimiento!) }))
-          .filter(({ diasActuales }) => diasActuales < e.diasMin)
+          .filter(({ diasActuales }) => diasActuales < minDays)
           .sort((a, b) => b.diasActuales - a.diasActuales);
 
         const proximo = candidatos[0] ?? null;
@@ -89,11 +101,11 @@ export default function ProyeccionDisponibilidad() {
 
         let diasFaltantes: number | null = null;
         if (proximo) {
-          diasFaltantes = diasParaEtapa(proximo.lote.fecha_nacimiento!, especie, e.nombre);
+          diasFaltantes = minDays - diasDesde(proximo.lote.fecha_nacimiento!);
         }
 
         return {
-          etapa: e.nombre,
+          etapa: e.name,
           stock,
           proximoLote: proximo?.lote ?? null,
           otrosLotes: otros,
@@ -102,14 +114,14 @@ export default function ProyeccionDisponibilidad() {
       });
     }
     return result;
-  }, [lotes]);
+  }, [lotes, profiles, sizeClasses]);
 
   const resumen = useMemo(() => {
     let sinLoteCercano = 0; // sin lote próximo o lejano (>7d) y sin stock
     let reponen8a15 = 0;
     let disponibles = 0;
-    for (const especie of ESPECIES) {
-      for (const fila of proyPorEspecie[especie]) {
+    for (const p of profiles) {
+      for (const fila of (proyPorEspecie[p.id] || [])) {
         const estado = clasificar(fila.stock, fila.diasFaltantes);
         if (estado === "disponible") disponibles++;
         else if (estado === "pronto") reponen8a15++;
@@ -162,15 +174,15 @@ export default function ProyeccionDisponibilidad() {
         </div>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Especie)}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v)}>
         <TabsList>
-          {ESPECIES.map((e) => (
-            <TabsTrigger key={e} value={e}>{ESPECIE_LABEL[e]}</TabsTrigger>
+          {profiles.map((p) => (
+            <TabsTrigger key={p.id} value={p.id}>{p.operational_name || p.species_name}</TabsTrigger>
           ))}
         </TabsList>
 
-        {ESPECIES.map((especie) => (
-          <TabsContent key={especie} value={especie} className="mt-4">
+        {profiles.map((p) => (
+          <TabsContent key={p.id} value={p.id} className="mt-4">
             <div className="glass-card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -183,7 +195,7 @@ export default function ProyeccionDisponibilidad() {
                     </tr>
                   </thead>
                   <tbody>
-                    {proyPorEspecie[especie].map((fila) => {
+                    {(proyPorEspecie[p.id] || []).map((fila) => {
                       const estado = clasificar(fila.stock, fila.diasFaltantes);
                       const badge = badgeFor(estado, fila.diasFaltantes, fila.stock);
                       const lote = fila.proximoLote;

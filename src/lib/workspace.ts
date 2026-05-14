@@ -38,16 +38,24 @@ export function rowToWorkspaceContext(row: WorkspaceRow): WorkspaceContext {
 /**
  * Create a workspace from a draft configuration
  */
-export function createWorkspaceFromDraft(draft: {
+export async function createWorkspaceFromDraft(draft: {
   name: string;
-  purpose: WorkspacePurpose;
-  subtype: WorkspaceSubtype;
-}): Omit<WorkspaceRow, 'id' | 'created_at' | 'updated_at'> {
+  purpose: string;
+  operation?: string | null;
+  animalClass?: string | null;
+  species?: string | null;
+}): Promise<WorkspaceRow> {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
   return {
+    id: `ws_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     name: draft.name,
-    purpose: draft.purpose,
-    subtype: draft.subtype,
-    owner_id: '', // Will be set by the server
+    purpose: draft.purpose as WorkspacePurpose,
+    subtype: draft.operation as WorkspaceSubtype || 'other',
+    owner_id: 'mock_user_id',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     is_active: true,
   };
 }

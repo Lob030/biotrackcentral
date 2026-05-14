@@ -24,6 +24,8 @@ export const speciesKeys = {
   profile: (profileId: string) => [...speciesKeys.all, "profile", profileId] as const,
   sizeClasses: (speciesProfileId: string) => [...speciesKeys.all, "size-classes", speciesProfileId] as const,
   settings: (speciesProfileId: string) => [...speciesKeys.all, "settings", speciesProfileId] as const,
+  inventoryCounts: (speciesProfileId: string) => [...speciesKeys.all, "inventory-counts", speciesProfileId] as const,
+  unclassified: (speciesId: string) => [...speciesKeys.all, "unclassified", speciesId] as const,
 };
 
 // ============================================================================
@@ -336,6 +338,84 @@ export function useOperationalSettings(speciesProfileId: string | null) {
     queryKey: speciesKeys.settings(speciesProfileId!),
     queryFn: () => fetchOperationalSettings(speciesProfileId!),
     enabled: !!speciesProfileId,
+  });
+}
+
+/**
+ * Get inventory counts per size class for a species profile
+ */
+export function useSpeciesInventoryCounts(speciesProfileId: string | null) {
+  return useQuery({
+    queryKey: speciesKeys.inventoryCounts(speciesProfileId!),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lots")
+        .select("size_class_id")
+        .eq("is_archived", false)
+        .eq("estado", "activo");
+      
+      if (error) throw error;
+      
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((lot: any) => {
+        if (lot.size_class_id) {
+          counts[lot.size_class_id] = (counts[lot.size_class_id] || 0) + 1;
+        }
+      });
+      return counts;
+    },
+    enabled: !!speciesProfileId,
+  });
+}
+
+/**
+ * Get unclassified lots for a species
+ */
+export function useUnclassifiedLots(speciesName: string | null) {
+  return useQuery({
+    queryKey: speciesKeys.unclassified(speciesName!),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lots")
+        .select("*, species_size_classes(name)")
+        .eq("especie", speciesName!)
+        .is("size_class_id", null)
+        .eq("is_archived", false)
+        .eq("estado", "activo");
+      
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!speciesName,
+  });
+}
+
+/**
+ * Migrate lots to a specific size class
+ */
+export function useMigrateLots(opts?: { onSuccess?: () => void }) {
+  const qc = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (args: { lotIds: string[]; sizeClassId: string; sizeClassName: string }) => {
+      const { error: e1 } = await supabase
+        .from("lots")
+        .update({ size_class_id: args.sizeClassId })
+        .in("id", args.lotIds);
+      
+      if (e1) throw e1;
+      
+      const { error: e2 } = await supabase
+        .from("current_lot_state")
+        .update({ size_class_id: args.sizeClassId, size_class_name: args.sizeClassName })
+        .in("lot_id", args.lotIds);
+        
+      if (e2) throw e2;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: speciesKeys.all });
+      opts?.onSuccess?.();
+    },
   });
 }
 

@@ -13,6 +13,10 @@ import PageLoader from "@/components/PageLoader";
 import RoleRoute from "@/components/RoleRoute";
 import PublicRoute from "./components/PublicRoute";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
+import { RuntimeConnectionMonitor } from "./core/connectivity/RuntimeConnectionMonitor";
+import { SupabaseHealthMonitor } from "./core/connectivity/SupabaseHealthMonitor";
+import { RuntimeHeartbeat } from "./core/connectivity/RuntimeHeartbeat";
+import { ConnectivityStatusBanner } from "./core/connectivity/ConnectivityStatusBanner";
 
 // Eager — small + on the critical path
 import Auth from "./pages/Auth";
@@ -36,6 +40,7 @@ const Pedidos = lazy(() => import("./modules/bioterio/pages/Pedidos"));
 const Ventas = lazy(() => import("./modules/bioterio/pages/Ventas"));
 const MasterPanel = lazy(() => import("./pages/MasterPanel"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const WorkspaceSelector = lazy(() => import("./modules/hub/components/WorkspaceSelector"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,6 +69,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <RuntimeConnectionMonitor />
+      <SupabaseHealthMonitor />
+      <RuntimeHeartbeat />
       <ErrorBoundary>
         <BrowserRouter>
           <AuthProvider>
@@ -79,6 +87,10 @@ const App = () => (
               <Route
                 path="/onboarding"
                 element={<ProtectedRoute>{withSuspense(<Onboarding />)}</ProtectedRoute>}
+              />
+              <Route
+                path="/hub"
+                element={<ProtectedRoute>{withSuspense(<WorkspaceSelector />)}</ProtectedRoute>}
               />
               <Route element={<ProtectedRoute><RequireWorkspace><AppLayout /></RequireWorkspace></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />

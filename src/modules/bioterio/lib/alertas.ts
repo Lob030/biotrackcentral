@@ -1,4 +1,4 @@
-import { diasDesde, etapaActual, type Especie } from "./etapas";
+
 
 export type AlertaSeveridad = "info" | "warning" | "critical";
 
@@ -14,11 +14,20 @@ export interface Alerta {
 }
 
 // Umbrales para considerar "listo para destete"
-const DIAS_DESTETE: Record<Especie, number> = {
+// Umbrales para considerar "listo para destete" (Fallback si no hay settings operacionales)
+const DIAS_DESTETE: Record<string, number> = {
   Raton: 21,
+  mouse: 21,
   Rata: 24,
+  rat: 24,
   ASF: 28,
+  asf: 28,
 };
+
+function diasDesde(fecha: string | Date): number {
+  const d = typeof fecha === "string" ? new Date(fecha) : fecha;
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 // Días desde introducción a engorda para considerar "listo"
 const DIAS_ENGORDA_LISTO = 60;
@@ -32,7 +41,7 @@ export function generarAlertas(
 
   for (const lote of lotes) {
     if (lote.estado !== "activo") continue;
-    const especie = lote.especie as Especie;
+    const especie = lote.especie || lote.species_id;
     const dias = diasDesde(lote.fecha_nacimiento);
 
     // Destete pendiente
@@ -45,7 +54,7 @@ export function generarAlertas(
           tipo: "destete",
           severidad: exceso > 7 ? "critical" : "warning",
           titulo: `Lote ${lote.codigo || lote.id.slice(0, 6)} listo para destete`,
-          descripcion: `${especie} · ${dias} días · etapa ${etapaActual(especie, lote.fecha_nacimiento)}. Recomendado dividir.`,
+          descripcion: `${especie} · ${dias} días · etapa ${lote.species_size_classes?.name || "—"}. Recomendado dividir.`,
           loteId: lote.id,
           accion: { label: "Ir a lote", href: "/lotes" },
         });

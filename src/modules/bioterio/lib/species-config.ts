@@ -1,23 +1,4 @@
-import { ETAPAS, type Especie } from "@/lib/etapas";
-
-export type PreloadedSpeciesId = "asf" | "raton" | "rata";
-
-export const PRELOADED_TO_ESPECIE: Record<PreloadedSpeciesId, Especie> = {
-  asf: "ASF",
-  raton: "Raton",
-  rata: "Rata",
-};
-
-interface PreloadedSpeciesMeta {
-  displayName: string;
-  fullName: string;
-}
-
-const META: Record<PreloadedSpeciesId, PreloadedSpeciesMeta> = {
-  asf: { displayName: "ASF", fullName: "African Soft-furred Rat" },
-  raton: { displayName: "Ratón", fullName: "Ratón de laboratorio" },
-  rata: { displayName: "Rata", fullName: "Rata de laboratorio" },
-};
+export type PreloadedSpeciesId = "asf" | "raton" | "rata" | "insectos";
 
 export interface PreloadedSpecies {
   id: PreloadedSpeciesId;
@@ -27,23 +8,15 @@ export interface PreloadedSpecies {
   precioBase: number;
 }
 
-export const PRELOADED_SPECIES: ReadonlyArray<PreloadedSpecies> = (
-  Object.keys(PRELOADED_TO_ESPECIE) as PreloadedSpeciesId[]
-).map((id) => {
-  const especie = PRELOADED_TO_ESPECIE[id];
-  const etapas = ETAPAS[especie] ?? [];
-  const pinky = etapas.find((e) => e.nombre === "Pinky");
-  return {
-    id,
-    displayName: META[id].displayName,
-    fullName: META[id].fullName,
-    etapas: etapas.length,
-    precioBase: pinky?.precio ?? etapas[0]?.precio ?? 0,
-  };
-});
+export const PRELOADED_SPECIES: ReadonlyArray<PreloadedSpecies> = [
+  { id: "asf", displayName: "ASF", fullName: "African Soft-furred Rat", etapas: 7, precioBase: 15 },
+  { id: "raton", displayName: "Ratón", fullName: "Ratón de laboratorio", etapas: 7, precioBase: 16 },
+  { id: "rata", displayName: "Rata", fullName: "Rata de laboratorio", etapas: 13, precioBase: 16 },
+  { id: "insectos", displayName: "Insectos", fullName: "Colonias de Insectos (Dubia, Tenebrio, etc)", etapas: 4, precioBase: 0 },
+];
 
 export function isPreloadedSpeciesId(v: unknown): v is PreloadedSpeciesId {
-  return v === "asf" || v === "raton" || v === "rata";
+  return v === "asf" || v === "raton" || v === "rata" || v === "insectos";
 }
 
 export function getPreloadedSpecies(id: PreloadedSpeciesId): PreloadedSpecies | undefined {

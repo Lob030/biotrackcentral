@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { FlaskConical, LayoutDashboard, GitBranch, Package, Layers, BellRing, Boxes, Shield, Users, ShoppingCart, BarChart2, LogOut } from "lucide-react";
+import { FlaskConical, LayoutDashboard, GitBranch, Package, Layers, BellRing, Boxes, Shield, Users, ShoppingCart, BarChart2, LogOut, Grid } from "lucide-react";
 import { useWorkspaceContext } from "@/hooks/useWorkspaceContext";
 import type { NavigationItem } from "@/shared/types/workspace";
 
@@ -31,6 +31,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   'flask-conical': FlaskConical,
   'boxes': Boxes,
   'shield': Shield,
+  'grid': Grid,
 };
 
 // Fallback static navigation (preserved for compatibility)
@@ -91,6 +92,13 @@ export function AppSidebar() {
   const adminItems = useMemo(() => {
     const items: NavigationItem[] = [];
     if (role === "admin" || isSuperAdmin) {
+      items.push({
+        id: 'workspace_selector',
+        label: 'Volver al selector',
+        path: '/hub',
+        moduleId: 'bioterio_dashboard',
+        icon: 'grid',
+      });
       items.push({
         id: 'admin_panel',
         label: 'Administración',

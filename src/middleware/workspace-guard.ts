@@ -53,8 +53,12 @@ export function useWorkspaceGuard() {
 
         if (cancelled) return;
 
-        // Si hay error (ej. tabla no existe), tratamos como sin workspace
-        if (error || !data || data.length === 0) {
+        // Si la tabla no existe, el mock de localStorage define si tiene workspace
+        const localWorkspace = localStorage.getItem('biotrack_active_workspace');
+        
+        if (localWorkspace) {
+           setHasWorkspace(true);
+        } else if (error || !data || data.length === 0) {
           setHasWorkspace(false);
         } else {
           setHasWorkspace(true);
@@ -87,10 +91,10 @@ export function useWorkspaceGuard() {
     if (!hasWorkspace && currentPath !== "/onboarding") {
       // Usuario sin workspace intentando acceder a otra ruta → forzar onboarding
       navigate("/onboarding", { replace: true });
-    } else if (hasWorkspace && currentPath === "/onboarding") {
-      // Usuario con workspace intentando acceder a onboarding → redirigir a dashboard
-      navigate("/dashboard", { replace: true });
     }
+    // Note: We removed the auto-redirect from /onboarding to /dashboard 
+    // to allow the "Agregar nuevo" flow from the Hub.
+
   }, [hasWorkspace, loading, location.pathname, navigate]);
 
   return { hasWorkspace, loading };

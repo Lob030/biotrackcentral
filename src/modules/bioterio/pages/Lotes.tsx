@@ -13,7 +13,6 @@ import { Plus, Pencil, Trash2, Scissors, GitFork, Skull, DollarSign, ArrowRightL
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { Link } from "react-router-dom";
-import { etapaActual, diasDesde, type Especie } from "@/modules/bioterio/lib/etapas";
 import EventoDialog, { type EventoTipo } from "@/modules/bioterio/components/EventoDialog";
 import { useCajaOptions, useLineaGeneticaOptions } from "@/modules/bioterio/data/options";
 import { useLotesList } from "@/modules/bioterio/data/lotes";
@@ -23,12 +22,13 @@ import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Layers as LayersIcon } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useSpeciesProfiles } from "../species/data";
 
 interface Lote {
   id: string;
   codigo: string | null;
   tipo: "nacimiento" | "engorda" | "reproduccion";
-  especie: Especie;
+  especie: string;
   linea_genetica_id: string | null;
   caja_id: string | null;
   fecha_nacimiento: string;
@@ -44,6 +44,7 @@ interface Lote {
   notas: string | null;
   lineas_geneticas?: { nombre: string; color_etiqueta: string } | null;
   cajas?: { codigo: string } | null;
+  species_size_classes?: { name: string; sale_price: number | null } | null;
 }
 
 export default function Lotes() {
@@ -59,9 +60,11 @@ export default function Lotes() {
   const [eventoLote, setEventoLote] = useState<Lote | null>(null);
   const [eventoTipo, setEventoTipo] = useState<EventoTipo>("mortalidad");
 
+  const { data: speciesProfiles = [] } = useSpeciesProfiles(profile?.workspace_id || "");
+
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
-    codigo: "", tipo: "nacimiento" as const, especie: "Raton" as Especie,
+    codigo: "", tipo: "nacimiento" as const, especie: "Raton",
     linea_genetica_id: "", caja_id: "",
     fecha_nacimiento: today, fecha_introduccion_caja: "",
     cantidad_inicial: "", cantidad_actual: "", machos: "", hembras: "", notas: "",
@@ -121,7 +124,21 @@ export default function Lotes() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ codigo: "", tipo: "nacimiento", especie: "Raton", linea_genetica_id: "", caja_id: "", fecha_nacimiento: today, fecha_introduccion_caja: "", cantidad_inicial: "", cantidad_actual: "", machos: "", hembras: "", notas: "" });
+    const defaultSpecies = speciesProfiles[0]?.speciesName || "Raton";
+    setForm({ 
+      codigo: "", 
+      tipo: "nacimiento", 
+      especie: defaultSpecies, 
+      linea_genetica_id: "", 
+      caja_id: "", 
+      fecha_nacimiento: today, 
+      fecha_introduccion_caja: "", 
+      cantidad_inicial: "", 
+      cantidad_actual: "", 
+      machos: "", 
+      hembras: "", 
+      notas: "" 
+    });
     setOpen(true);
   };
 
@@ -173,9 +190,9 @@ export default function Lotes() {
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las especies</SelectItem>
-            <SelectItem value="ASF">ASF</SelectItem>
-            <SelectItem value="Raton">Ratón</SelectItem>
-            <SelectItem value="Rata">Rata</SelectItem>
+            {speciesProfiles.map(p => (
+              <SelectItem key={p.id} value={p.speciesName}>{p.operationalName}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={filterEstado} onValueChange={setFilterEstado}>
@@ -196,8 +213,8 @@ export default function Lotes() {
       ) : (
         <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-70" : ""}`}>
           {filtered.map((l) => {
-            const dias = diasDesde(l.fecha_nacimiento);
-            const etapa = etapaActual(l.especie, l.fecha_nacimiento);
+            const dias = Math.floor((Date.now() - new Date(l.fecha_nacimiento).getTime()) / (1000 * 60 * 60 * 24));
+            const etapa = l.species_size_classes?.name || "—";
             return (
               <div key={l.id} className="glass-card p-5 flex items-center gap-4 flex-wrap group hover:border-primary/40 transition">
                 <div className="flex-1 min-w-[200px]">
@@ -297,9 +314,9 @@ export default function Lotes() {
                 <Select value={form.especie} onValueChange={(v: any) => setForm({ ...form, especie: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Raton">Ratón</SelectItem>
-                    <SelectItem value="Rata">Rata</SelectItem>
-                    <SelectItem value="ASF">ASF</SelectItem>
+                    {speciesProfiles.map(p => (
+                      <SelectItem key={p.id} value={p.speciesName}>{p.operationalName}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

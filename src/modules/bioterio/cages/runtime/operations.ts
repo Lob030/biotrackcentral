@@ -958,3 +958,10 @@ export function relocateSubdividedLots(options: {
 export function _getCageStore(): CageStore {
   return store;
 }
+
+/**
+ * Get a single cage by ID (convenience wrapper over the store).
+ */
+export function getCageById(id: string): Cage | undefined {
+  return store.get(id) ?? undefined;
+}

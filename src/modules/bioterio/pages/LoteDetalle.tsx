@@ -14,7 +14,6 @@ import {
   Calendar,
   Layers,
 } from "lucide-react";
-import { etapaActual, diasDesde, type Especie } from "@/modules/bioterio/lib/etapas";
 import EventoDialog, { type EventoTipo } from "@/modules/bioterio/components/EventoDialog";
 
 const TIPO_META: Record<
@@ -69,7 +68,7 @@ export default function LoteDetalle() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lotes")
-        .select("*, lineas_geneticas(nombre, color_etiqueta), cajas(codigo)")
+        .select("*, lineas_geneticas(nombre, color_etiqueta), cajas(codigo), species_size_classes(name)")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
@@ -118,8 +117,8 @@ export default function LoteDetalle() {
       </div>
     );
 
-  const dias = diasDesde(lote.fecha_nacimiento);
-  const etapa = etapaActual(lote.especie as Especie, lote.fecha_nacimiento);
+  const dias = Math.floor((Date.now() - new Date(lote.fecha_nacimiento).getTime()) / (1000 * 60 * 60 * 24));
+  const etapa = lote.species_size_classes?.name || "—";
 
   return (
     <div className="p-6 md:p-8 max-w-[1400px] mx-auto animate-fade-in">

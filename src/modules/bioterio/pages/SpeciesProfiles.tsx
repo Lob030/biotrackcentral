@@ -7,7 +7,21 @@
 
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, ArrowLeft, Settings, Package, Egg, TrendingUp, AlertTriangle } from "lucide-react";
+import { 
+  Search,
+  Plus,
+  RefreshCw,
+  LayoutGrid,
+  List,
+  ArrowLeft,
+  ArrowRight,
+  Settings, 
+  Package, 
+  Egg, 
+  TrendingUp, 
+  AlertTriangle,
+  DollarSign 
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +31,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorState } from "@/components/ui/error-state";
 import { StatGridSkeleton } from "@/components/ui/list-skeleton";
+import { cn } from "@/lib/utils";
 
-import { SpeciesProfileCard } from "../components/SpeciesProfileCard";
-import { SizeClassEditor } from "../components/SizeClassEditor";
-import { ClassificationFlow, InventoryClassificationSummary } from "../components/ClassificationFlow";
+import { SpeciesProfileCard } from "../species/components/SpeciesProfileCard";
+import { SizeClassEditor } from "../species/components/SizeClassEditor";
+import { ClassificationFlow, InventoryClassificationSummary } from "../species/components/ClassificationFlow";
+import { MigrationAssistant } from "../species/components/MigrationAssistant";
+import { useLotesList } from "../data/lotes";
 
 import {
   useSpeciesProfiles,
@@ -33,10 +50,11 @@ import {
   useUpdateSizeClass,
   useDeleteSizeClass,
   useReorderSizeClasses,
-} from "../../data/index";
+  useSpeciesInventoryCounts,
+} from "../species/data/index";
 
-import { validateSpeciesConfiguration } from "../runtime/operations";
-import type { WorkspaceSpeciesProfile, SpeciesSizeClass, SpeciesOperationalSettings } from "../runtime/types";
+import { validateSpeciesConfiguration } from "../species/runtime/operations";
+import type { SpeciesSizeClass } from "../species/runtime/types";
 
 // Starter blueprint options
 const STARTER_BLUEPRINTS = [
@@ -75,11 +93,37 @@ export default function SpeciesProfilesPage() {
   const selectedProfileQuery = useSpeciesProfile(speciesId || null);
   const sizeClassesQuery = useSizeClasses(speciesId || null);
   const settingsQuery = useOperationalSettings(speciesId || null);
+  const inventoryCountsQuery = useSpeciesInventoryCounts(speciesId || null);
 
   const profiles = profilesQuery.data ?? [];
   const selectedProfile = selectedProfileQuery.data;
   const sizeClasses = sizeClassesQuery.data ?? [];
   const settings = settingsQuery.data;
+  const lotCounts = inventoryCountsQuery.data ?? {};
+
+  // Fetch all lots for overview stats
+  const { data: allLots = [] } = useLotsList({ estado: "activo" });
+  
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
+  const [showCustomSpeciesForm, setShowCustomSpeciesForm] = useState(false);
+  const [customSpeciesData, setCustomSpeciesData] = useState({
+    speciesName: "",
+    operationalName: "",
+    scientificName: "",
+    description: "",
+  });
+
+  const overviewStats = useMemo(() => {
+    const totalLots = allLots.length;
+    const activeSpecies = profiles.filter(p => p.isActive).length;
+    const totalValue = allLots.reduce((sum, lot) => {
+      return sum + (lot.species_size_classes?.sale_price || 0);
+    }, 0);
+
+    return { totalLots, activeSpecies, totalValue };
+  }, [allLots, profiles]);
 
   const isLoading = profilesQuery.isLoading;
   const error = profilesQuery.error;
@@ -91,16 +135,6 @@ export default function SpeciesProfilesPage() {
   const updateSizeClassMutation = useUpdateSizeClass();
   const deleteSizeClassMutation = useDeleteSizeClass();
   const reorderSizeClassesMutation = useReorderSizeClasses();
-
-  // UI State
-  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
-  const [showCustomSpeciesForm, setShowCustomSpeciesForm] = useState(false);
-  const [customSpeciesData, setCustomSpeciesData] = useState({
-    speciesName: "",
-    operationalName: "",
-    scientificName: "",
-    description: "",
-  });
 
   // Validation
   const validation = useMemo(() => {
@@ -210,32 +244,87 @@ export default function SpeciesProfilesPage() {
   // List View
   if (!speciesId) {
     return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className="p-6 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-in">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Perfiles de Especies</h1>
-            <p className="text-sm text-muted-foreground">
-              Configura las clasificaciones operacionales para cada especie
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Perfiles de Especies
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Configuración operacional y runtime de clasificaciones por bioterio.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowCustomSpeciesForm(true)}
-              className="h-9 text-sm"
+              onClick={() => profilesQuery.refetch()}
+              disabled={profilesQuery.isFetching}
+              className="h-10"
             >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Especie Personalizada
+              <RefreshCw className={cn("h-4 w-4 mr-2", profilesQuery.isFetching && "animate-spin")} />
+              Sincronizar
             </Button>
-            <Button
-              onClick={() => setShowBlueprintModal(true)}
-              className="h-9 text-sm"
-            >
-              <Package className="h-4 w-4 mr-1.5" />
-              Desde Plantilla
+            <Button onClick={() => setShowCustomSpeciesForm(true)} className="h-10">
+              <Plus className="h-4 w-4 mr-2" /> Nuevo Perfil
             </Button>
           </div>
+        </div>
+
+        {/* Operational Overview Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">
+                    Especies Activas
+                  </p>
+                  <h3 className="text-3xl font-bold text-foreground mt-1">
+                    {overviewStats.activeSpecies}
+                  </h3>
+                </div>
+                <div className="bg-primary/10 p-3 rounded-xl">
+                  <Package className="h-6 w-6 text-primary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-emerald-500/5 border-emerald-500/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                    Inventario Total
+                  </p>
+                  <h3 className="text-3xl font-bold text-foreground mt-1">
+                    {overviewStats.totalLots.toLocaleString()}
+                  </h3>
+                </div>
+                <div className="bg-emerald-500/10 p-3 rounded-xl">
+                  <TrendingUp className="h-6 w-6 text-emerald-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-amber-500/5 border-amber-500/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                    Valor Operativo Est.
+                  </p>
+                  <h3 className="text-3xl font-bold text-foreground mt-1">
+                    ${overviewStats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </h3>
+                </div>
+                <div className="bg-amber-500/10 p-3 rounded-xl">
+                  <DollarSign className="h-6 w-6 text-amber-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Content */}
@@ -247,30 +336,6 @@ export default function SpeciesProfilesPage() {
             message={error instanceof Error ? error.message : "Error desconocido"}
             retry={() => profilesQuery.refetch()}
           />
-        ) : profiles.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-16 text-center">
-              <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">Sin especies configuradas</h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                Comienza configurando una especie desde una plantilla o crea una especie personalizada
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCustomSpeciesForm(true)}
-                  className="text-sm"
-                >
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Personalizada
-                </Button>
-                <Button onClick={() => setShowBlueprintModal(true)} className="text-sm">
-                  <Package className="h-4 w-4 mr-1.5" />
-                  Desde Plantilla
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {profiles.map((profile) => (
@@ -288,114 +353,126 @@ export default function SpeciesProfilesPage() {
         <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Seleccionar Plantilla de Especie</DialogTitle>
+              <DialogTitle className="display-font text-xl">Seleccionar Plantilla de Especie</DialogTitle>
               <DialogDescription>
-                Elige una plantilla para comenzar. Todas las plantillas son completamente editables.
+                Elige una plantilla optimizada para comenzar. Todas las plantillas son completamente editables para ajustarse a tu operación.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 sm:grid-cols-2">
               {STARTER_BLUEPRINTS.map((blueprint) => (
                 <Card
                   key={blueprint.id}
-                  className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
+                  className="cursor-pointer group hover:border-primary transition-all hover:shadow-md bg-card/50"
                   onClick={() => handleCreateFromBlueprint(blueprint.id)}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-semibold">{blueprint.name}</h4>
-                        <p className="text-xs text-muted-foreground italic mb-2">
-                          {blueprint.scientificName}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{blueprint.description}</p>
-                        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Package className="h-3.5 w-3.5" />
-                            {blueprint.defaultSizeClasses} clasificaciones predeterminadas
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Egg className="h-3.5 w-3.5" />
-                            Parámetros reproductivos incluidos
-                          </span>
+                  <CardContent className="p-5">
+                    <div className="flex flex-col h-full">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-foreground group-hover:text-primary transition-colors">
+                          {blueprint.name}
+                        </h4>
+                        <Badge variant="secondary" className="text-[10px]">Blueprint</Badge>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground italic mb-3">
+                        {blueprint.scientificName}
+                      </p>
+                      <p className="text-sm text-muted-foreground line-clamp-2 flex-1">
+                        {blueprint.description}
+                      </p>
+                      <div className="mt-4 pt-4 border-t border-border/60 flex items-center justify-between text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                        <span>{blueprint.defaultSizeClasses} Etapas</span>
+                        <div className="flex items-center gap-1 text-primary">
+                          Elegir <ArrowRight className="h-3 w-3" />
                         </div>
                       </div>
-                      <Badge variant="secondary">Editable</Badge>
                     </div>
                   </CardContent>
                 </Card>
               ))}
+              
+              {/* Custom option card inside the grid */}
+              <Card
+                className="cursor-pointer group border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all"
+                onClick={() => {
+                  setShowBlueprintModal(false);
+                  setShowCustomSpeciesForm(true);
+                }}
+              >
+                <CardContent className="p-5 flex flex-col items-center justify-center h-full text-center space-y-3">
+                  <div className="bg-muted p-3 rounded-full group-hover:bg-primary/10 transition-colors">
+                    <Plus className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-foreground group-hover:text-primary transition-colors">
+                      Especie Personalizada
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Crea una configuración desde cero
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowBlueprintModal(false)}>
-                Cancelar
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Custom Species Form Modal */}
         <Dialog open={showCustomSpeciesForm} onOpenChange={setShowCustomSpeciesForm}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
-              <DialogTitle>Nueva Especie Personalizada</DialogTitle>
+              <DialogTitle className="display-font text-xl">Nueva Especie Personalizada</DialogTitle>
               <DialogDescription>
-                Crea una especie completamente personalizada con tus propias clasificaciones.
+                Define los detalles básicos para tu nueva configuración de especie.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-5 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="speciesName">Nombre de la Especie *</Label>
+                <Label htmlFor="speciesName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Nombre de la Especie *
+                </Label>
                 <Input
                   id="speciesName"
                   value={customSpeciesData.speciesName}
-                  onChange={(e) =>
-                    setCustomSpeciesData({ ...customSpeciesData, speciesName: e.target.value })
-                  }
+                  onChange={(e) => setCustomSpeciesData({ ...customSpeciesData, speciesName: e.target.value })}
                   placeholder="Ej: Hámster Sirio"
+                  className="h-10 focus:ring-primary"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="operationalName">Nombre Operacional</Label>
-                <Input
-                  id="operationalName"
-                  value={customSpeciesData.operationalName}
-                  onChange={(e) =>
-                    setCustomSpeciesData({ ...customSpeciesData, operationalName: e.target.value })
-                  }
-                  placeholder="Déjalo vacío para usar el mismo nombre"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="scientificName">Nombre Científico</Label>
+                <Label htmlFor="scientificName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Nombre Científico (opcional)
+                </Label>
                 <Input
                   id="scientificName"
                   value={customSpeciesData.scientificName}
-                  onChange={(e) =>
-                    setCustomSpeciesData({ ...customSpeciesData, scientificName: e.target.value })
-                  }
+                  onChange={(e) => setCustomSpeciesData({ ...customSpeciesData, scientificName: e.target.value })}
                   placeholder="Ej: Mesocricetus auratus"
+                  className="h-10 focus:ring-primary"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="description">Descripción</Label>
+                <Label htmlFor="description" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Descripción Operacional
+                </Label>
                 <Input
                   id="description"
                   value={customSpeciesData.description}
-                  onChange={(e) =>
-                    setCustomSpeciesData({ ...customSpeciesData, description: e.target.value })
-                  }
-                  placeholder="Descripción opcional"
+                  onChange={(e) => setCustomSpeciesData({ ...customSpeciesData, description: e.target.value })}
+                  placeholder="Uso, propósito o notas rápidas..."
+                  className="h-10 focus:ring-primary"
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCustomSpeciesForm(false)}>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="ghost" onClick={() => setShowCustomSpeciesForm(false)}>
                 Cancelar
               </Button>
-              <Button
+              <Button 
                 onClick={handleCreateCustomSpecies}
                 disabled={!customSpeciesData.speciesName || upsertProfileMutation.isPending}
+                className="bg-gradient-primary text-white"
               >
+                {upsertProfileMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
                 Crear Especie
               </Button>
             </DialogFooter>
@@ -413,9 +490,7 @@ export default function SpeciesProfilesPage() {
           <Button variant="ghost" size="icon" onClick={() => navigate("/bioterio/species")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Cargando...</h1>
-          </div>
+          <h1 className="text-2xl font-bold">Cargando...</h1>
         </div>
       </div>
     );
@@ -423,22 +498,19 @@ export default function SpeciesProfilesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/bioterio/species")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl font-bold text-foreground">{selectedProfile.speciesName}</h1>
-              {selectedProfile.isStarterBlueprint && (
-                <Badge variant="secondary" className="text-xs">Plantilla</Badge>
-              )}
-              {selectedProfile.isCustom && (
-                <Badge variant="outline" className="text-xs">Personalizada</Badge>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold text-foreground">{selectedProfile.speciesName}</h1>
+            {selectedProfile.isStarterBlueprint && (
+              <Badge variant="secondary" className="text-xs">Plantilla</Badge>
+            )}
+            {selectedProfile.isCustom && (
+              <Badge variant="outline" className="text-xs">Personalizada</Badge>
+            )}
             {selectedProfile.scientificName && (
               <p className="text-sm text-muted-foreground italic">
                 {selectedProfile.scientificName}
@@ -497,6 +569,12 @@ export default function SpeciesProfilesPage() {
 
         {/* Right Column - Visualization & Settings */}
         <div className="space-y-6">
+          {/* Migration Assistant */}
+          <MigrationAssistant 
+            speciesName={selectedProfile.speciesName} 
+            sizeClasses={sizeClasses} 
+          />
+
           {/* Classification Flow */}
           <Card>
             <CardHeader>
@@ -508,8 +586,14 @@ export default function SpeciesProfilesPage() {
                 Progresión operacional de clasificaciones
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <ClassificationFlow sizeClasses={sizeClasses} />
+              <div className="pt-6 border-t border-border">
+                <InventoryClassificationSummary 
+                  sizeClasses={sizeClasses} 
+                  lotCounts={lotCounts}
+                />
+              </div>
             </CardContent>
           </Card>
 

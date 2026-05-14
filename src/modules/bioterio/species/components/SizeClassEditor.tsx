@@ -78,7 +78,7 @@ function EditableSizeClassRow({
 
   if (isEditing) {
     return (
-      <div className="rounded-lg border-2 border-primary bg-card p-4 space-y-3">
+      <div className="rounded-lg border-2 border-primary bg-card p-4 md:p-4 space-y-3">
         {/* Name & Code Row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -88,7 +88,7 @@ function EditableSizeClassRow({
             <Input
               value={editData.name || ""}
               onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-              className="h-9 text-sm"
+              className="h-11 md:h-9 text-sm"
               placeholder="Ej: Pinky, Adulto, 20g"
               autoFocus
             />
@@ -100,7 +100,7 @@ function EditableSizeClassRow({
             <Input
               value={editData.code || ""}
               onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
-              className="h-9 text-sm"
+              className="h-11 md:h-9 text-sm"
               placeholder="PK, AD, 20G"
               maxLength={4}
             />
@@ -238,17 +238,17 @@ function EditableSizeClassRow({
             variant="outline"
             size="sm"
             onClick={handleCancel}
-            className="h-8 text-xs"
+            className="h-11 md:h-8 text-sm md:text-xs px-4"
           >
-            <X className="h-3.5 w-3.5 mr-1" />
+            <X className="h-4 w-4 mr-1.5" />
             Cancelar
           </Button>
           <Button
             size="sm"
             onClick={handleSave}
-            className="h-8 text-xs bg-primary hover:bg-primary/90"
+            className="h-11 md:h-8 text-sm md:text-xs px-4 bg-primary hover:bg-primary/90"
           >
-            <Check className="h-3.5 w-3.5 mr-1" />
+            <Check className="h-4 w-4 mr-1.5" />
             Guardar
           </Button>
         </div>
@@ -266,9 +266,9 @@ function EditableSizeClassRow({
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Drag Handle */}
-        <div className="pt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
-          <GripVertical className="h-4 w-4" />
+        {/* Drag Handle — large touch target for mobile */}
+        <div className="pt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-1.5 -m-1.5 rounded-md active:bg-muted/50">
+          <GripVertical className="h-5 w-5 md:h-4 md:w-4" />
         </div>
 
         {/* Content */}
@@ -347,13 +347,13 @@ function EditableSizeClassRow({
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Actions — always visible on mobile, hover-reveal on desktop */}
+        <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon"
             onClick={onStartEdit}
-            className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+            className="h-10 w-10 md:h-8 md:w-8 hover:bg-primary/10 hover:text-primary"
           >
             <Pencil className="h-4 w-4" />
           </Button>
@@ -361,7 +361,7 @@ function EditableSizeClassRow({
             variant="ghost"
             size="icon"
             onClick={onDelete}
-            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+            className="h-10 w-10 md:h-8 md:w-8 hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
