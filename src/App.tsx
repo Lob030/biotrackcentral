@@ -18,6 +18,7 @@ import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 import Auth from "./pages/Auth";
 import Dashboard from "./modules/bioterio/pages/Dashboard";
 import NotFound from "./pages/NotFound";
+const SpeciesProfiles = lazy(() => import("./modules/bioterio/pages/SpeciesProfiles"));
 
 // Lazy — heavier or rarely-first-visit pages.
 // Code-splits the bundle so the initial load stays small.
@@ -86,6 +87,8 @@ const App = () => (
                 <Route path="/lotes" element={withSuspense(<Lotes />)} />
                 <Route path="/lotes/:id" element={withSuspense(<LoteDetalle />)} />
                 <Route path="/stock" element={withSuspense(<Stock />)} />
+                <Route path="/species" element={withSuspense(<SpeciesProfiles />)} />
+                <Route path="/species/:speciesId" element={withSuspense(<SpeciesProfiles />)} />
                 <Route path="/clientes" element={withSuspense(<Clientes />)} />
                 <Route path="/clientes/:id" element={withSuspense(<ClientePerfil />)} />
                 <Route path="/pedidos" element={withSuspense(<Pedidos />)} />
