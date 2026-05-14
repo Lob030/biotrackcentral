@@ -1,4 +1,7 @@
-import { diasDesde } from "./etapas";
+function diasDesde(fecha: string | Date): number {
+  const d = typeof fecha === "string" ? new Date(fecha) : fecha;
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+}
 import type { Alerta } from "./alertas";
 
 export interface DatosEvaluacion {

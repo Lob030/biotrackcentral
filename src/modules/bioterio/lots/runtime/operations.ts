@@ -87,7 +87,7 @@ function generateLotCode(speciesId: SpeciesId, strain?: string): string {
 export function createLot(options: CreateLotOptions): Lot {
   const now = new Date();
   const id = generateId();
-  const code = generateLotCode(options.species, options.strain);
+  const code = generateLotCode(options.speciesId, options.strain);
 
   // Build lineage based on source type
   let lineage: LotLineage;
@@ -138,6 +138,7 @@ export function createLot(options: CreateLotOptions): Lot {
     lineage,
     notes: options.notes,
     tags: options.tags,
+    sizeClassId: options.sizeClassId,
   };
 
   // Save the lot
@@ -244,6 +245,8 @@ export function subdivideLot(options: SubdivideLotOptions): {
       lineage: childLineage,
       notes: subdivision.notes,
       tags: parentLot.tags,
+      sizeClassId: parentLot.sizeClassId,
+      sizeClassName: parentLot.sizeClassName,
     };
 
     store.save(childLot);
@@ -534,11 +537,13 @@ export function getLotSummary(lotId: string): LotSummary | null {
   return {
     id: lot.id,
     code: lot.code,
-    species: lot.species,
+    speciesId: lot.speciesId,
     sex: lot.sex,
     currentQuantity: lot.currentQuantity,
     status: lot.status,
     location: lot.location,
+    sizeClassId: lot.sizeClassId,
+    sizeClassName: lot.sizeClassName,
   };
 }
 
@@ -577,4 +582,26 @@ export function getLotStatistics(): {
  */
 export function _getStore(): LotStore {
   return store;
+}
+
+/**
+ * Get a single lot by ID (convenience wrapper over the store).
+ */
+export function getLotById(id: string): Lot | undefined {
+  return store.getLot(id);
+}
+
+/**
+ * Register mortality for a lot.
+ * Semantic alias for removeAnimalsFromLot with isMortality=true.
+ */
+export function registerMortality(options: {
+  lotId: string;
+  quantity: number;
+  reason?: string;
+  notes?: string;
+}): { lot: Lot } {
+  const lot = removeAnimalsFromLot(options.lotId, options.quantity, options.reason || options.notes, true);
+  if (!lot) throw new Error(`Lot not found: ${options.lotId}`);
+  return { lot };
 }

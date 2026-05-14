@@ -51,7 +51,7 @@ import {
   PieChart as PieIcon,
   RefreshCw,
 } from "lucide-react";
-import { CATEGORIAS_GASTO, CATEGORIA_MAP, fmtMoney, CategoriaGasto } from "@/lib/gastos";
+import { CATEGORIAS_GASTO, CATEGORIA_MAP, fmtMoney, CategoriaGasto } from "@/modules/bioterio/lib/gastos";
 
 type SortKey = "fecha" | "monto";
 type SortDir = "asc" | "desc";

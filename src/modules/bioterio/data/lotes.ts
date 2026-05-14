@@ -12,9 +12,10 @@ import { bioterioTypes } from "../types";
 export type LoteListRow = bioterioTypes.LoteRow & {
   lineas_geneticas?: { nombre: string; color_etiqueta: string } | null;
   cajas?: { codigo: string } | null;
+  species_size_classes?: { name: string; sale_price: number | null } | null;
 };
 
-const LOTE_LIST_SELECT = "*, lineas_geneticas(nombre, color_etiqueta), cajas(codigo)";
+const LOTE_LIST_SELECT = "*, lineas_geneticas(nombre, color_etiqueta), cajas(codigo), species_size_classes(name, sale_price)";
 
 export async function fetchLotesList(filters?: { estado?: string }): Promise<LoteListRow[]> {
   let q = supabase
@@ -48,7 +49,7 @@ export type LoteStockRow = LoteRow;
 export async function fetchLotesStock(): Promise<LoteStockRow[]> {
   const { data, error } = await supabase
     .from("lotes")
-    .select("*")
+    .select("*, species_size_classes(name, sale_price)")
     .eq("estado", "activo")
     .in("tipo", ["nacimiento", "engorda"]);
   if (error) throw error;
@@ -80,7 +81,7 @@ export type LoteProyeccionRow = {
 export async function fetchLotesProyeccion(): Promise<LoteProyeccionRow[]> {
   const { data, error } = await supabase
     .from("lotes")
-    .select("id,codigo,especie,fecha_nacimiento,cantidad_actual,estado")
+    .select("id,codigo,especie,fecha_nacimiento,cantidad_actual,estado, species_size_classes(name)")
     .eq("estado", "activo")
     .not("fecha_nacimiento", "is", null)
     .order("fecha_nacimiento", { ascending: true });

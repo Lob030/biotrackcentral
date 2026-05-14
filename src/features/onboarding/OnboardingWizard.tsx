@@ -6,9 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { OnboardingProvider, useOnboardingState } from "./hooks/useOnboardingState";
 import StepPurpose from "./steps/StepPurpose";
-import StepSubtype from "./steps/StepSubtype";
-import StepAnimalClass from "./steps/StepAnimalClass";
-import StepSpecies from "./steps/StepSpecies";
+import StepOperation from "./steps/StepOperation";
 import WorkspaceSummary from "./steps/WorkspaceSummary";
 
 function WizardInner() {
@@ -45,9 +43,7 @@ function WizardInner() {
 
         <div>
           {currentStep === 1 && <StepPurpose />}
-          {currentStep === 2 && <StepSubtype />}
-          {currentStep === 3 && <StepAnimalClass />}
-          {currentStep === 4 && <StepSpecies />}
+          {currentStep === 2 && <StepOperation />}
           {currentStep === "summary" && <WorkspaceSummary onConfirm={handleConfirm} />}
         </div>
 
@@ -58,7 +54,7 @@ function WizardInner() {
               Atrás
             </Button>
             <Button onClick={next} disabled={!canAdvance}>
-              {currentStep === 4 ? "Revisar resumen" : "Continuar"}
+              {currentStep === 2 ? "Revisar resumen" : "Continuar"}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>

@@ -6,8 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import GastosTab from "@/components/GastosTab";
-import MejoresClientesTab from "@/components/MejoresClientesTab";
+import GastosTab from "../components/GastosTab";
+import MejoresClientesTab from "../components/MejoresClientesTab";
 import {
   BarChart2,
   DollarSign,

@@ -145,6 +145,8 @@ export interface Lot {
   // Operational state
   status: LotStatus;
   location?: string;      // Cage/room location identifier
+  sizeClassId?: string;   // Dynamic size classification ID
+  sizeClassName?: string; // Dynamic size classification Name (denormalized)
   
   // Lineage reference (denormalized for quick access)
   lineage: LotLineage;
@@ -167,6 +169,7 @@ export interface CreateLotOptions {
   birthDate?: Date;
   acquisitionDate?: Date;
   location?: string;
+  sizeClassId?: string;   // Initialize with specific size class
   supplierName?: string;
   notes?: string;
   tags?: string[];
@@ -208,4 +211,6 @@ export interface LotSummary {
   currentQuantity: number;
   status: LotStatus;
   location?: string;
+  sizeClassId?: string;
+  sizeClassName?: string;
 }

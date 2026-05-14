@@ -24,7 +24,7 @@ import {
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { invalidateLoteEventos } from "@/lib/invalidations";
-import { useCajaOptions } from "@/data/options";
+import { useCajaOptions } from "../data/options";
 
 export type EventoTipo = "mortalidad" | "venta" | "traslado_caja" | "ajuste" | "nota";
 

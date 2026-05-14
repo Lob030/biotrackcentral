@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Trash, Eye, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
-import { ETAPAS, calcularTotales, obtenerPrecio, etapaActual, type Especie } from "@/modules/bioterio/lib/etapas";
 import { useClienteOptionsActivos } from "@/modules/bioterio/data/options";
 import { invalidatePedidos } from "@/lib/invalidations";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -33,10 +32,35 @@ interface Pedido {
 }
 
 interface DetalleLinea {
-  especie: Especie;
+  especie: string;
   etapa: string;
   cantidad: number;
   precio_unitario: number;
+}
+
+export interface DescuentoAplicado {
+  monto: number;
+  porcentaje: number;
+  razon: string;
+}
+
+export function calcularDescuento(subtotal: number): DescuentoAplicado | null {
+  if (subtotal >= 10000) return { porcentaje: 20, monto: subtotal * 0.2, razon: "Volumen > $10,000" };
+  if (subtotal >= 5000) return { porcentaje: 15, monto: subtotal * 0.15, razon: "Volumen > $5,000" };
+  if (subtotal >= 2500) return { porcentaje: 10, monto: subtotal * 0.10, razon: "Volumen > $2,500" };
+  if (subtotal >= 600) return { porcentaje: 5, monto: subtotal * 0.05, razon: "Volumen > $600" };
+  return null;
+}
+
+export function calcularTotales(subtotal: number) {
+  const descuento = calcularDescuento(subtotal);
+  const montoDescuento = descuento?.monto ?? 0;
+  const total = subtotal - montoDescuento;
+  return {
+    subtotal: Math.round(subtotal * 100) / 100,
+    descuento: descuento ? { ...descuento, monto: Math.round(montoDescuento * 100) / 100 } : null,
+    total: Math.round(total * 100) / 100,
+  };
 }
 
 const ESTADOS_PEDIDO = [
@@ -75,7 +99,25 @@ export default function Pedidos() {
 
   const [detalles, setDetalles] = useState<DetalleLinea[]>([]);
   const [newDetalle, setNewDetalle] = useState<DetalleLinea>({
-    especie: "Raton", etapa: "", cantidad: 1, precio_unitario: 0,
+    especie: "", etapa: "", cantidad: 1, precio_unitario: 0,
+  });
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["all-species-profiles", profile?.organization_id],
+    queryFn: async () => {
+      const { data } = await supabase.from("workspace_species_profiles").select("*").eq("workspace_id", profile?.organization_id).eq("is_active", true);
+      return data ?? [];
+    },
+    enabled: !!profile?.organization_id,
+  });
+
+  const { data: sizeClasses = [] } = useQuery({
+    queryKey: ["all-size-classes", profile?.organization_id],
+    queryFn: async () => {
+      const { data } = await supabase.from("species_size_classes").select("*").eq("workspace_id", profile?.organization_id).order("display_order");
+      return data ?? [];
+    },
+    enabled: !!profile?.organization_id,
   });
 
   const { data: pedidos = [] } = useQuery({
@@ -99,14 +141,14 @@ export default function Pedidos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lotes")
-        .select("especie, fecha_nacimiento, cantidad_actual, estado")
+        .select("especie, fecha_nacimiento, cantidad_actual, estado, species_size_classes(name)")
         .eq("estado", "activo")
         .gt("cantidad_actual", 0);
       if (error) throw error;
       const map: Record<string, number> = {};
       (data ?? []).forEach((l: any) => {
-        const etapa = etapaActual(l.especie as Especie, l.fecha_nacimiento);
-        if (etapa === "—") return;
+        const etapa = l.species_size_classes?.name;
+        if (!etapa) return;
         const key = `${l.especie}__${etapa}`;
         map[key] = (map[key] ?? 0) + (l.cantidad_actual ?? 0);
       });
@@ -114,7 +156,7 @@ export default function Pedidos() {
     },
   });
 
-  const stockDe = (especie: Especie, etapa: string) => stockMap[`${especie}__${etapa}`] ?? 0;
+  const stockDe = (especie: string, etapa: string) => stockMap[`${especie}__${etapa}`] ?? 0;
   const stockSeleccionado = newDetalle.etapa ? stockDe(newDetalle.especie, newDetalle.etapa) : null;
   const excedeStock = stockSeleccionado !== null && newDetalle.cantidad > stockSeleccionado;
 
@@ -189,7 +231,7 @@ export default function Pedidos() {
   const resetForm = () => {
     setForm({ numero_pedido: "", cliente_id: "", fecha_pedido: new Date().toISOString().slice(0, 10), estado: "pendiente", notas: "" });
     setDetalles([]);
-    setNewDetalle({ especie: "Raton", etapa: "", cantidad: 1, precio_unitario: 0 });
+    setNewDetalle({ especie: profiles.length > 0 ? profiles[0].species_id : "", etapa: "", cantidad: 1, precio_unitario: 0 });
   };
 
   const openNew = () => {
@@ -211,7 +253,7 @@ export default function Pedidos() {
     });
     const { data } = await supabase.from("pedidos_detalles").select("*").eq("pedido_id", p.id);
     setDetalles((data ?? []).map((d: any) => ({
-      especie: d.especie as Especie, etapa: d.etapa, cantidad: d.cantidad, precio_unitario: Number(d.precio_unitario),
+      especie: d.especie, etapa: d.etapa, cantidad: d.cantidad, precio_unitario: Number(d.precio_unitario),
     })));
     setOpen(true);
   };
@@ -226,7 +268,11 @@ export default function Pedidos() {
       toast.error(`No hay suficiente stock. Disponibles: ${disponible} unidades`);
       return;
     }
-    const precio = newDetalle.precio_unitario || obtenerPrecio(newDetalle.especie, newDetalle.etapa);
+    let precio = newDetalle.precio_unitario;
+    if (!precio) {
+      const cls = sizeClasses.find((c: any) => c.name === newDetalle.etapa);
+      precio = cls?.sale_price || 0;
+    }
     setDetalles([...detalles, { ...newDetalle, precio_unitario: precio }]);
     setNewDetalle({ especie: newDetalle.especie, etapa: "", cantidad: 1, precio_unitario: 0 });
   };
@@ -234,10 +280,11 @@ export default function Pedidos() {
   const quitarDetalle = (idx: number) => setDetalles(detalles.filter((_, i) => i !== idx));
 
   const onChangeEtapa = (etapa: string) => {
-    setNewDetalle({ ...newDetalle, etapa, precio_unitario: obtenerPrecio(newDetalle.especie, etapa) });
+    const cls = sizeClasses.find((c: any) => c.name === etapa);
+    setNewDetalle({ ...newDetalle, etapa, precio_unitario: cls?.sale_price || 0 });
   };
 
-  const onChangeEspecie = (especie: Especie) => {
+  const onChangeEspecie = (especie: string) => {
     setNewDetalle({ especie, etapa: "", cantidad: 1, precio_unitario: 0 });
   };
 
@@ -366,9 +413,9 @@ export default function Pedidos() {
                     <Select value={newDetalle.especie} onValueChange={(v: any) => onChangeEspecie(v)}>
                       <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ASF">ASF</SelectItem>
-                        <SelectItem value="Raton">Ratón</SelectItem>
-                        <SelectItem value="Rata">Rata</SelectItem>
+                        {profiles.map((p: any) => (
+                          <SelectItem key={p.species_id} value={p.species_id}>{p.operational_name || p.species_name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -377,13 +424,16 @@ export default function Pedidos() {
                     <Select value={newDetalle.etapa} onValueChange={onChangeEtapa}>
                       <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>
-                        {(ETAPAS[newDetalle.especie] ?? []).map((e) => {
-                          const stk = stockDe(newDetalle.especie, e.nombre);
+                        {sizeClasses.filter((c: any) => {
+                          const p = profiles.find((pr: any) => pr.species_id === newDetalle.especie);
+                          return p && c.species_profile_id === p.id;
+                        }).map((c: any) => {
+                          const stk = stockDe(newDetalle.especie, c.name);
                           const sin = stk <= 0;
                           return (
-                            <SelectItem key={e.nombre} value={e.nombre}>
+                            <SelectItem key={c.name} value={c.name}>
                               <span className={sin ? "text-destructive line-through" : ""}>
-                                {e.nombre} · ${e.precio.toFixed(2)}
+                                {c.name} · ${(c.sale_price || 0).toFixed(2)}
                                 {sin ? " (sin stock)" : ` · ${stk}u`}
                               </span>
                             </SelectItem>

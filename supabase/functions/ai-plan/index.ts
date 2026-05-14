@@ -293,6 +293,56 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Workspace inválido" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Fetch workspace species context
+    const { data: speciesProfiles } = await supabase
+      .from("workspace_species_profiles")
+      .select("id, species_name, operational_name")
+      .eq("workspace_id", workspace_id)
+      .eq("is_active", true);
+
+    const { data: sizeClasses } = await supabase
+      .from("species_size_classes")
+      .select("id, species_profile_id, name, code, min_age_days, max_age_days, sale_price, display_order")
+      .eq("workspace_id", workspace_id)
+      .eq("is_active", true)
+      .order("display_order");
+
+    // Fetch live availability per classification
+    const { data: activeLots } = await supabase
+      .from("lotes")
+      .select("id, codigo, especie, size_class_id, cantidad_actual, fecha_nacimiento, estado, tipo")
+      .eq("workspace_id", workspace_id)
+      .eq("estado", "activo")
+      .in("tipo", ["nacimiento", "engorda"]);
+
+    const { data: activeReservations } = await supabase
+      .from("inventory_reservations")
+      .select("species_profile_id, size_class_id, remaining_quantity")
+      .eq("workspace_id", workspace_id)
+      .eq("status", "active");
+
+    // Build availability context per classification
+    const availabilityByClass: Record<string, number> = {};
+    for (const lot of (activeLots ?? [])) {
+      if (!lot.size_class_id) continue;
+      availabilityByClass[lot.size_class_id] = (availabilityByClass[lot.size_class_id] ?? 0) + (lot.cantidad_actual ?? 0);
+    }
+    // Subtract reservations
+    for (const res of (activeReservations ?? [])) {
+      if (!res.size_class_id) continue;
+      availabilityByClass[res.size_class_id] = Math.max(0, (availabilityByClass[res.size_class_id] ?? 0) - (res.remaining_quantity ?? 0));
+    }
+
+    const speciesContext = (speciesProfiles ?? []).map(p => {
+      const pClasses = (sizeClasses ?? []).filter((sc: any) => sc.species_profile_id === p.id);
+      const classLines = pClasses.map((sc: any) => {
+        const available = availabilityByClass[sc.id] ?? 0;
+        const price = sc.sale_price ? `$${sc.sale_price}` : "sin precio";
+        return `  · ${sc.name}${sc.code ? ` [${sc.code}]` : ""}: ${available} disponibles (${price})`;
+      }).join("\n");
+      return `- ${p.operational_name} (${p.species_name}):\n${classLines || "  · Sin clasificaciones"}`;
+    }).join("\n");
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -300,7 +350,13 @@ Deno.serve(async (req) => {
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Today: ${new Date().toISOString().slice(0, 10)}\n\nCommand: ${prompt}` },
+          { role: "user", content: `Operational Context for Workspace ${workspace_id}:
+
+LIVE INVENTORY AVAILABILITY (derived, reservations already deducted):
+${speciesContext || "No inventory data available."}
+
+Today: ${new Date().toISOString().slice(0, 10)}
+Command: ${prompt}` },
         ],
         tools: buildTools(),
         tool_choice: "required",

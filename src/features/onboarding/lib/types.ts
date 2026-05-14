@@ -1,13 +1,25 @@
-import type { PreloadedSpeciesId } from "@/lib/species-config";
+import type { PreloadedSpeciesId } from "@/modules/bioterio/lib/species-config";
 
 export type Purpose = "pet" | "business" | "vet";
 
-export type Subtype =
-  | "Granja/Bioterio"
+export type OperationType =
+  | "Bioterio"
+  | "Granja cunícola"
+  | "Granja avícola"
+  | "Ganadería bovina"
   | "PIMVS"
   | "UMA"
   | "Comercializadora"
+  | "Acuario / Operación acuática"
   | "Clínica Veterinaria";
+
+export interface OperationalBlueprint {
+  id: OperationType;
+  name: string;
+  description: string;
+  modules: string[];
+  isPrimary: boolean;
+}
 
 export type AnimalClass =
   | "Mamíferos"
@@ -20,7 +32,7 @@ export type AnimalClass =
 
 export interface WorkspaceDraft {
   purpose: Purpose;
-  subtype: Subtype | null;
+  operation: OperationType | null;
   animalClass: AnimalClass;
   species: PreloadedSpeciesId | string | null;
   name: string;

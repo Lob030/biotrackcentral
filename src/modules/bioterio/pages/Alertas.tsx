@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { generarAlertas, type AlertaSeveridad, type Alerta } from "@/lib/alertas";
+import { generarAlertas, type AlertaSeveridad, type Alerta } from "@/modules/bioterio/lib/alertas";
 import {
   evaluarAlertasPersonalizadas,
   marcarRecordatoriosGenerados,
-} from "@/lib/alertasPersonalizadas";
+} from "@/modules/bioterio/lib/alertasPersonalizadas";
 import { AlertTriangle, AlertCircle, Info, BellRing, ArrowRight, CheckCircle2, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import AdministrarAlertasModal from "@/components/AdministrarAlertasModal";
+import AdministrarAlertasModal from "../components/AdministrarAlertasModal";
 
 const severityConfig: Record<AlertaSeveridad, { icon: any; cls: string; label: string; iconCls: string }> = {
   critical: {

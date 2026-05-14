@@ -16,6 +16,36 @@
 // ============================================================================
 
 /**
+ * Operational Quantity Unit
+ * 
+ * Defines the unit of measurement used for lot quantities.
+ * This abstracts operations away from assuming "individuals".
+ */
+export type OperationalQuantityUnit =
+  | 'individuals'
+  | 'grams'
+  | 'kilograms'
+  | 'colonies'
+  | 'trays'
+  | 'containers'
+  | 'liters';
+
+/**
+ * Species Runtime Capability Profile
+ * 
+ * Defines the operational capabilities supported by a specific species.
+ * Used to dynamically adapt dashboards, workflows, and validations.
+ */
+export interface SpeciesRuntimeCapabilityProfile {
+  operationalQuantityUnit: OperationalQuantityUnit;
+  reproductionMode: 'isolated_pairs' | 'harem_groups' | 'mass_colony' | 'batch_cycle' | 'none';
+  subdivisionMode: 'sex_separated' | 'weight_graded' | 'random_split' | 'none';
+  occupancyMode: 'individual_count' | 'biomass_density' | 'container_count';
+  forecastingMode: 'discrete_timeline' | 'continuous_flow' | 'batch_harvest';
+}
+
+
+/**
  * Workspace Species Profile
  * 
  * The main entity that defines how a workspace operationally manages a species.
@@ -40,6 +70,9 @@ export interface WorkspaceSpeciesProfile {
   isActive: boolean;
   isCustom: boolean;           // true if created by workspace (false = starter blueprint)
   isStarterBlueprint: boolean; // true if based on built-in starter blueprint
+  
+  // Capabilities
+  capabilities: SpeciesRuntimeCapabilityProfile;
   
   // Metadata
   createdAt: Date;
@@ -232,6 +265,13 @@ export const ASF_STARTER_BLUEPRINT: WorkspaceSpeciesProfile = {
   isActive: true,
   isCustom: false,
   isStarterBlueprint: true,
+  capabilities: {
+    operationalQuantityUnit: 'individuals',
+    reproductionMode: 'harem_groups',
+    subdivisionMode: 'sex_separated',
+    occupancyMode: 'individual_count',
+    forecastingMode: 'discrete_timeline',
+  },
   createdAt: new Date(),
   updatedAt: new Date(),
 };

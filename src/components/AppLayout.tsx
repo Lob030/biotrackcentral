@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import OperationalAssistantBar from "@/modules/bioterio/ai/components/OperationalAssistantBar";
+import { ConnectivityStatusBanner } from "@/core/connectivity/ConnectivityStatusBanner";
 
 export default function AppLayout() {
   return (
@@ -9,6 +10,7 @@ export default function AppLayout() {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
+          <ConnectivityStatusBanner />
           <header className="md:hidden h-14 flex items-center border-b border-border/60 px-4 backdrop-blur-xl bg-background/70 sticky top-0 z-30">
             <SidebarTrigger />
           </header>

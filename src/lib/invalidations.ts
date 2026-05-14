@@ -16,7 +16,7 @@
  * factories in `queryKeys.ts` without touching call sites.
  */
 import type { QueryClient } from "@tanstack/react-query";
-import { lotesStockKey, lotesProyeccionKey } from "@/data/lotes";
+import { lotesStockKey, lotesProyeccionKey } from "../modules/bioterio/data/lotes";
 
 /**
  * Invalidate every cache that depends on the lotes table.

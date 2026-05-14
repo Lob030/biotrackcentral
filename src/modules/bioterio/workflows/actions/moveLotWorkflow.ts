@@ -18,9 +18,8 @@
 
 import type { MoveLotWorkflowInput, MoveLotWorkflowResult, WorkflowResult, ValidationError } from '../types';
 import { persistenceServices } from '../../persistence';
-import { moveLot } from '../../lots/runtime/operations';
+import { moveLot, getCageById } from '../../cages/runtime/operations';
 import { getLotById } from '../../lots/runtime/operations';
-import { getCageById } from '../../cages/runtime/operations';
 
 export async function moveLotWorkflow(
   input: MoveLotWorkflowInput,

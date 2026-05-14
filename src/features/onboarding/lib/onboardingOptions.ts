@@ -1,4 +1,4 @@
-import type { AnimalClass, Purpose, Subtype } from "./types";
+import type { AnimalClass, Purpose, OperationType, OperationalBlueprint } from "./types";
 
 export const PURPOSE_OPTIONS: { value: Purpose; label: string; description: string }[] = [
   { value: "pet", label: "Mascota personal", description: "Llevar el control de mis propios animales en casa." },
@@ -6,16 +6,83 @@ export const PURPOSE_OPTIONS: { value: Purpose; label: string; description: stri
   { value: "vet", label: "Veterinaria", description: "Atención clínica o gestión veterinaria profesional." },
 ];
 
-const BUSINESS_SUBTYPES: Subtype[] = ["Granja/Bioterio", "PIMVS", "UMA", "Comercializadora"];
-const VET_SUBTYPES: Subtype[] = [...BUSINESS_SUBTYPES, "Clínica Veterinaria"];
+export const OPERATIONAL_BLUEPRINTS: OperationalBlueprint[] = [
+  {
+    id: "Bioterio",
+    name: "Bioterio",
+    description: "Gestión operacional por lotes para especies de reproducción, producción o alimentación controlada.",
+    modules: ["Lotes", "Reproducción", "Clasificación", "Disponibilidad", "IA operacional"],
+    isPrimary: true,
+  },
+  {
+    id: "Granja avícola",
+    name: "Granja avícola",
+    description: "Producción de aves, huevos y gestión de postura.",
+    modules: ["Producción", "Clasificación", "Postura", "Inventario"],
+    isPrimary: true,
+  },
+  {
+    id: "Comercializadora",
+    name: "Comercializadora",
+    description: "Gestión de stock comercial, ventas y clientes.",
+    modules: ["Stock", "Ventas", "Clientes", "Inventario"],
+    isPrimary: true,
+  },
+  {
+    id: "Granja cunícola",
+    name: "Granja cunícola",
+    description: "Producción de conejos para pie de cría o abasto.",
+    modules: ["Lotes", "Reproducción", "Inventario", "Ventas"],
+    isPrimary: false,
+  },
+  {
+    id: "Ganadería bovina",
+    name: "Ganadería bovina",
+    description: "Operación ganadera para producción de carne o leche.",
+    modules: ["Individuos", "Salud", "Producción", "Ventas"],
+    isPrimary: false,
+  },
+  {
+    id: "PIMVS",
+    name: "PIMVS",
+    description: "Predios o instalaciones que manejan vida silvestre.",
+    modules: ["Legal", "Trazabilidad", "Inventario", "Salud"],
+    isPrimary: false,
+  },
+  {
+    id: "UMA",
+    name: "UMA",
+    description: "Unidades de Manejo para la Conservación de la Vida Silvestre.",
+    modules: ["Conservación", "Trazabilidad", "Legal", "Reproducción"],
+    isPrimary: false,
+  },
+  {
+    id: "Acuario / Operación acuática",
+    name: "Acuario / Operación acuática",
+    description: "Gestión de biomasa acuática y calidad de agua.",
+    modules: ["Estanques", "Biomasa", "Calidad de Agua", "Inventario"],
+    isPrimary: false,
+  },
+  {
+    id: "Clínica Veterinaria",
+    name: "Clínica Veterinaria",
+    description: "Atención clínica, consultas y gestión de pacientes.",
+    modules: ["Pacientes", "Consultas", "Expedientes", "Facturación"],
+    isPrimary: false,
+  },
+];
 
-export function getSubtypesFor(purpose: Purpose | null): Subtype[] {
-  if (purpose === "vet") return VET_SUBTYPES;
-  if (purpose === "business") return BUSINESS_SUBTYPES;
+export function getOperationsFor(purpose: Purpose | null): OperationalBlueprint[] {
+  if (purpose === "vet") {
+    return OPERATIONAL_BLUEPRINTS.filter(bp => bp.id === "Clínica Veterinaria" || bp.isPrimary);
+  }
+  if (purpose === "business") {
+    return OPERATIONAL_BLUEPRINTS.filter(bp => bp.id !== "Clínica Veterinaria");
+  }
   return [];
 }
 
-export function requiresSubtype(purpose: Purpose | null): boolean {
+export function requiresOperation(purpose: Purpose | null): boolean {
   return purpose === "business" || purpose === "vet";
 }
 
