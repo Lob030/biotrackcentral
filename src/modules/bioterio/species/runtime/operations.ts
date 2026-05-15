@@ -30,6 +30,9 @@ import {
   ASF_STARTER_BLUEPRINT,
   ASF_DEFAULT_SIZE_CLASSES,
   ASF_DEFAULT_OPERATIONAL_SETTINGS,
+  TENEBRIO_STARTER_BLUEPRINT,
+  TENEBRIO_DEFAULT_SIZE_CLASSES,
+  TENEBRIO_DEFAULT_OPERATIONAL_SETTINGS,
 } from './types';
 
 // ============================================================================
@@ -169,6 +172,11 @@ export function createSpeciesProfileFromBlueprint(args: {
       blueprint = { ...ASF_STARTER_BLUEPRINT };
       defaultSizeClasses = ASF_DEFAULT_SIZE_CLASSES;
       defaultSettings = ASF_DEFAULT_OPERATIONAL_SETTINGS;
+      break;
+    case 'starter_tenebrio':
+      blueprint = { ...TENEBRIO_STARTER_BLUEPRINT };
+      defaultSizeClasses = TENEBRIO_DEFAULT_SIZE_CLASSES;
+      defaultSettings = TENEBRIO_DEFAULT_OPERATIONAL_SETTINGS;
       break;
     // Additional blueprints can be added here
     default:

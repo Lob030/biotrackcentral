@@ -18,6 +18,8 @@ import {
 } from "@/modules/bioterio/data/lineasGeneticas";
 import type { LineaGeneticaRow } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { getActiveWorkspaceId } from "@/lib/workspace";
+import { useSpeciesProfiles } from "@/modules/bioterio/species/data";
 
 const COLORS = ["#06b6d4", "#10b981", "#a855f7", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899", "#f97316", "#14b8a6", "#8b5cf6"];
 
@@ -31,9 +33,17 @@ export default function LineasGeneticas() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Linea | null>(null);
 
+  // Workspace-scoped species profiles
+  const workspaceId = getActiveWorkspaceId() ?? "";
+  const { data: speciesProfiles = [] } = useSpeciesProfiles(workspaceId);
+  const activeSpecies = speciesProfiles.filter(p => p.isActive);
+
+  // Default to the first active species operational name, or empty string
+  const defaultSpecies = activeSpecies[0]?.operationalName ?? "";
+
   const [form, setForm] = useState({
     nombre: "",
-    especie: "Raton" as "ASF" | "Raton" | "Rata",
+    especie: defaultSpecies,
     origen: "",
     fecha_registro: new Date().toISOString().slice(0, 10),
     color_etiqueta: COLORS[0],
@@ -70,7 +80,7 @@ export default function LineasGeneticas() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ nombre: "", especie: "Raton", origen: "", fecha_registro: new Date().toISOString().slice(0, 10), color_etiqueta: COLORS[0], notas: "" });
+    setForm({ nombre: "", especie: activeSpecies[0]?.operationalName ?? "", origen: "", fecha_registro: new Date().toISOString().slice(0, 10), color_etiqueta: COLORS[0], notas: "" });
     setOpen(true);
   };
 
@@ -115,9 +125,9 @@ export default function LineasGeneticas() {
           <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las especies</SelectItem>
-            <SelectItem value="ASF">ASF</SelectItem>
-            <SelectItem value="Raton">Ratón</SelectItem>
-            <SelectItem value="Rata">Rata</SelectItem>
+            {activeSpecies.map((sp) => (
+              <SelectItem key={sp.id} value={sp.operationalName}>{sp.operationalName}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -168,12 +178,12 @@ export default function LineasGeneticas() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Especie *</Label>
-                <Select value={form.especie} onValueChange={(v: any) => setForm({ ...form, especie: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={form.especie} onValueChange={(v) => setForm({ ...form, especie: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona especie" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Raton">Ratón</SelectItem>
-                    <SelectItem value="Rata">Rata</SelectItem>
-                    <SelectItem value="ASF">ASF</SelectItem>
+                    {activeSpecies.map((sp) => (
+                      <SelectItem key={sp.id} value={sp.operationalName}>{sp.operationalName}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

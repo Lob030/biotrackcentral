@@ -363,6 +363,129 @@ export const ASF_DEFAULT_OPERATIONAL_SETTINGS: Omit<SpeciesOperationalSettings, 
 };
 
 // ============================================================================
+// TENEBRIO MOLITOR STARTER BLUEPRINT
+// ============================================================================
+
+/**
+ * Starter Blueprint for Tenebrio molitor (Mealworm / Superworm colony)
+ *
+ * KEY DIFFERENCES FROM MAMMAL BLUEPRINTS:
+ * - operationalQuantityUnit: 'grams' — managed by MASS, not individual count
+ * - subdivisionMode: 'weight_graded' — no sex subdivision (mass-based splits)
+ * - occupancyMode: 'biomass_density' — measured in grams per container
+ * - reproductionMode: 'mass_colony' — colony-level reproduction, not pair/harem
+ * - forecastingMode: 'batch_harvest' — harvest-based projections
+ *
+ * All quantity labels (dashboard, projections, inventory, AI) MUST use grams.
+ */
+export const TENEBRIO_STARTER_BLUEPRINT: WorkspaceSpeciesProfile = {
+  id: 'starter_tenebrio',
+  workspaceId: '', // Set at workspace instantiation
+  speciesId: 'tenebrio_molitor',
+  speciesName: 'Tenebrios',
+  scientificName: 'Tenebrio molitor',
+  operationalName: 'Tenebrios',
+  description: 'Colonia de Tenebrio molitor — Gestión por masa en gramos. Sin separación por sexo.',
+  isActive: true,
+  isCustom: false,
+  isStarterBlueprint: true,
+  capabilities: {
+    operationalQuantityUnit: 'grams',
+    reproductionMode: 'mass_colony',
+    subdivisionMode: 'weight_graded',
+    occupancyMode: 'biomass_density',
+    forecastingMode: 'batch_harvest',
+  },
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+/**
+ * Default Tenebrio Size Classes (starter blueprint)
+ *
+ * These are EDITABLE workspace-specific records, not constants.
+ * Weights represent total lot mass sold, not individual animal weight.
+ * Prices are in MXN and are fully editable per workspace.
+ */
+export const TENEBRIO_DEFAULT_SIZE_CLASSES: Omit<SpeciesSizeClass, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  {
+    workspaceId: '',
+    speciesProfileId: '',
+    name: '100 gramos',
+    code: '100G',
+    minWeightGrams: 100,
+    maxWeightGrams: 100,
+    salePrice: 140,
+    displayOrder: 1,
+    isActive: true,
+    isDefault: false,
+    isCustom: false,
+    description: 'Presentación de 100 g',
+  },
+  {
+    workspaceId: '',
+    speciesProfileId: '',
+    name: '250 gramos',
+    code: '250G',
+    minWeightGrams: 250,
+    maxWeightGrams: 250,
+    salePrice: 250,
+    displayOrder: 2,
+    isActive: true,
+    isDefault: true,
+    isCustom: false,
+    description: 'Presentación de 250 g',
+  },
+  {
+    workspaceId: '',
+    speciesProfileId: '',
+    name: '500 gramos',
+    code: '500G',
+    minWeightGrams: 500,
+    maxWeightGrams: 500,
+    salePrice: 450,
+    displayOrder: 3,
+    isActive: true,
+    isDefault: false,
+    isCustom: false,
+    description: 'Presentación de 500 g',
+  },
+  {
+    workspaceId: '',
+    speciesProfileId: '',
+    name: '1 kilo',
+    code: '1KG',
+    minWeightGrams: 1000,
+    maxWeightGrams: 1000,
+    salePrice: 800,
+    displayOrder: 4,
+    isActive: true,
+    isDefault: false,
+    isCustom: false,
+    description: 'Presentación de 1 kg',
+  },
+];
+
+/**
+ * Default Tenebrio Operational Settings (starter blueprint)
+ *
+ * These values model the colony-level lifecycle, not individual insects.
+ * breedingCycleDays: approx. time from egg to harvestable larvae under managed conditions.
+ */
+export const TENEBRIO_DEFAULT_OPERATIONAL_SETTINGS: Omit<SpeciesOperationalSettings, 'id' | 'workspaceId' | 'speciesProfileId' | 'createdAt' | 'updatedAt'> = {
+  breedingCycleDays: 60,        // Egg to harvestable larva: ~60 days
+  expectedWeaningAgeDays: 0,    // Not applicable for insects
+  expectedGestationDays: 10,    // Egg incubation period
+  maturityAgeDays: 60,          // Larvae reach harvestable mass
+  expectedBirthWeightGrams: 0,  // Not tracked individually
+  expectedAdultWeightGrams: 0,  // Not tracked individually
+  expectedMortalityRate: 0.10,  // ~10% colony loss expected
+  expectedGrowthCurve: 'tenebrio_mass_colony',
+  defaultSexRatio: undefined,   // Sex ratio not managed
+  typicalLitterSize: undefined, // Not applicable
+};
+
+// ============================================================================
 // QUERY AND FILTER TYPES
 // ============================================================================
 
