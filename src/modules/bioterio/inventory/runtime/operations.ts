@@ -117,10 +117,10 @@ export function getOperationalAvailability(
 
     states.push({
       speciesProfileId,
-      speciesName: speciesProfile?.species_name ?? '',
-      operationalName: speciesProfile?.operational_name ?? '',
+      speciesDisplayName: speciesProfile?.display_name ?? '',
+      taxonomyKey: speciesProfile?.taxonomy_key ?? '',
       sizeClassId,
-      sizeClassName: sizeClass.name,
+      sizeClassName: sizeClass.display_name,
       sizeClassCode: sizeClass.code,
 
       totalAnimals,
