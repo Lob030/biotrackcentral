@@ -1,10 +1,6 @@
 /**
- * Maps an approved OperationalPlan to the matching workflow function
- * via useWorkflowActions. Single-op only — no batching.
- *
- * The runtime workflow functions are authoritative: they re-validate
- * occupancy, quantity, and compatibility. Even if the AI emitted bad
- * args, the workflow rejects execution.
+ * Maps an approved OperationalPlan to the matching workflow function via
+ * useWorkflowActions. Single-op only — no batching.
  */
 import type { useWorkflowActions } from "../workflows/hooks/useWorkflowActions";
 import type { WorkflowResult } from "../workflows/types";
@@ -13,7 +9,6 @@ import type { PlannedOperation } from "./client";
 type Actions = ReturnType<typeof useWorkflowActions>;
 
 export interface ExecutorContext {
-  /** Lookup IDs the resolver attached to op.args under the `_resolved` key. */
   resolved: ResolvedRefs;
 }
 
@@ -26,6 +21,8 @@ export interface ResolvedRefs {
   femaleLotId?: string;
   breedingGroupId?: string;
   litterLotId?: string;
+  /** Resolved by the AI edge function from speciesProfileId or speciesName. */
+  speciesProfileId?: string;
 }
 
 export async function executeOperation(
@@ -36,9 +33,14 @@ export async function executeOperation(
   const resolved = (args._resolved ?? {}) as ResolvedRefs;
 
   switch (op.intent) {
-    case "CREATE_LOT":
+    case "CREATE_LOT": {
+      const speciesProfileId =
+        resolved.speciesProfileId ?? (args.speciesProfileId as string | undefined);
+      if (!speciesProfileId) {
+        return { success: false, error: "Species profile not resolved" };
+      }
       return actions.createLot({
-        speciesId: String(args.speciesId),
+        speciesProfileId,
         strain: args.strain as string | undefined,
         sex: args.sex as "mixed" | "male" | "female",
         quantity: Number(args.quantity),
@@ -48,6 +50,7 @@ export async function executeOperation(
         cageId: resolved.cageId,
         notes: args.notes as string | undefined,
       });
+    }
 
     case "SUBDIVIDE_LOT":
       if (!resolved.lotId) return { success: false, error: "Lot not resolved" };
@@ -111,8 +114,12 @@ export async function executeOperation(
       if (!resolved.breedingGroupId) {
         return { success: false, error: "Breeding group not resolved" };
       }
+      if (!resolved.speciesProfileId) {
+        return { success: false, error: "Species profile not resolved for litter" };
+      }
       return actions.registerLitter({
         breedingGroupId: resolved.breedingGroupId,
+        speciesProfileId: resolved.speciesProfileId,
         litterSize: Number(args.litterSize),
         liveBirths: Number(args.liveBirths),
         stillbirths: args.stillbirths as number | undefined,

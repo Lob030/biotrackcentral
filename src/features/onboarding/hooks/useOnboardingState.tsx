@@ -1,20 +1,17 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { AnimalClass, Purpose, OperationType, WizardStep, WorkspaceDraft } from "../lib/types";
+import type { AnimalClass, Purpose, OperationType, SpeciesSeed, WizardStep, WorkspaceDraft } from "../lib/types";
 import { requiresOperation } from "../lib/onboardingOptions";
-import type { PreloadedSpeciesId } from "@/modules/bioterio/lib/species-config";
 import { ACTIVE_WORKSPACE_KEY, createWorkspaceFromDraft, type WorkspaceRow } from "@/lib/workspace";
 
 export const PENDING_WORKSPACE_KEY = "biotrack_pending_workspace";
-
-type SpeciesChoice = PreloadedSpeciesId | "custom" | null;
 
 interface OnboardingState {
   currentStep: WizardStep;
   purpose: Purpose | null;
   operation: OperationType | null;
   animalClass: AnimalClass | null;
-  speciesChoice: SpeciesChoice;
-  customSpecies: string;
+  speciesSeed: SpeciesSeed | null;
+  customSpeciesText: string;
 }
 
 const initial: OnboardingState = {
@@ -22,16 +19,16 @@ const initial: OnboardingState = {
   purpose: null,
   operation: null,
   animalClass: null,
-  speciesChoice: null,
-  customSpecies: "",
+  speciesSeed: null,
+  customSpeciesText: "",
 };
 
-interface OnboardingContextValue extends Omit<OnboardingState, never> {
+interface OnboardingContextValue extends OnboardingState {
   setPurpose: (p: Purpose) => void;
   setOperation: (s: OperationType) => void;
   setAnimalClass: (a: AnimalClass) => void;
-  setSpecies: (value: PreloadedSpeciesId | "custom", customText?: string) => void;
-  setCustomSpeciesText: (t: string) => void;
+  selectBlueprintSpecies: (taxonomyKey: string, displayName: string) => void;
+  selectCustomSpecies: (displayName: string) => void;
   goTo: (step: WizardStep) => void;
   next: () => void;
   back: () => void;
@@ -52,9 +49,9 @@ function getOrder(purpose: Purpose | null): WizardStep[] {
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<OnboardingState>(initial);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const totalSteps = requiresOperation(state.purpose) ? 2 : 1;
-
   const stepOrder = useMemo(() => getOrder(state.purpose), [state.purpose]);
   const progressIndex = Math.max(0, stepOrder.indexOf(state.currentStep));
 
@@ -64,8 +61,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         return state.purpose !== null;
       case 2:
         if (!state.operation) return false;
-        if (state.operation === 'Bioterio') {
-          return state.speciesChoice !== null && (state.speciesChoice !== 'custom' || state.customSpecies.trim().length > 0);
+        if (state.operation === "Bioterio") {
+          if (!state.speciesSeed) return false;
+          if (state.speciesSeed.kind === "custom") {
+            return state.speciesSeed.displayName.trim().length > 0;
+          }
+          return true;
         }
         return true;
       case "summary":
@@ -81,29 +82,44 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const setOperation = useCallback((operation: OperationType) => setState((s) => ({ ...s, operation })), []);
-  const setAnimalClass = useCallback((animalClass: AnimalClass) => setState((s) => ({ ...s, animalClass })), []);
+  const setOperation = useCallback(
+    (operation: OperationType) => setState((s) => ({ ...s, operation })),
+    [],
+  );
+  const setAnimalClass = useCallback(
+    (animalClass: AnimalClass) => setState((s) => ({ ...s, animalClass })),
+    [],
+  );
 
-  const setSpecies = useCallback((value: PreloadedSpeciesId | "custom", customText?: string) => {
+  const selectBlueprintSpecies = useCallback(
+    (taxonomyKey: string, displayName: string) => {
+      setState((s) => ({
+        ...s,
+        speciesSeed: { kind: "blueprint", taxonomyKey, displayName },
+        customSpeciesText: "",
+      }));
+    },
+    [],
+  );
+
+  const selectCustomSpecies = useCallback((displayName: string) => {
     setState((s) => ({
       ...s,
-      speciesChoice: value,
-      customSpecies: value === "custom" ? (customText ?? s.customSpecies) : "",
+      customSpeciesText: displayName,
+      speciesSeed: { kind: "custom", displayName: displayName.trim() },
     }));
   }, []);
 
-  const setCustomSpeciesText = useCallback((t: string) => {
-    setState((s) => ({ ...s, customSpecies: t, speciesChoice: "custom" }));
-  }, []);
-
-  const goTo = useCallback((step: WizardStep) => setState((s) => ({ ...s, currentStep: step })), []);
+  const goTo = useCallback(
+    (step: WizardStep) => setState((s) => ({ ...s, currentStep: step })),
+    [],
+  );
 
   const next = useCallback(() => {
     setState((s) => {
       const order = getOrder(s.purpose);
       const i = order.indexOf(s.currentStep);
-      const nextStep = i >= 0 && i < order.length - 1 ? order[i + 1] : s.currentStep;
-      return { ...s, currentStep: nextStep };
+      return { ...s, currentStep: i >= 0 && i < order.length - 1 ? order[i + 1] : s.currentStep };
     });
   }, []);
 
@@ -111,8 +127,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setState((s) => {
       const order = getOrder(s.purpose);
       const i = order.indexOf(s.currentStep);
-      const prev = i > 0 ? order[i - 1] : s.currentStep;
-      return { ...s, currentStep: prev };
+      return { ...s, currentStep: i > 0 ? order[i - 1] : s.currentStep };
     });
   }, []);
 
@@ -122,29 +137,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const buildDraft = useCallback((): WorkspaceDraft => {
-    let species: PreloadedSpeciesId | string | null;
-    if (state.speciesChoice === "custom") {
-      const txt = state.customSpecies.trim();
-      species = txt.length > 0 ? txt : null;
-    } else {
-      species = state.speciesChoice; // PreloadedSpeciesId | null
-    }
-
-    let animalClass: AnimalClass = "Mamíferos"; // Default fallback
-    if (species === "tenebrios") {
+    let animalClass: AnimalClass = "Mamíferos";
+    if (state.speciesSeed?.kind === "blueprint" && state.speciesSeed.taxonomyKey === "tenebrios") {
       animalClass = "Artrópodos";
     }
-
     return {
       purpose: state.purpose!,
       operation: requiresOperation(state.purpose) ? state.operation : null,
       animalClass,
-      species,
+      speciesSeed: state.speciesSeed,
       name: `Entorno ${new Date().toISOString()}`,
     };
   }, [state]);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const confirm = useCallback(async (): Promise<WorkspaceRow> => {
     const draft = buildDraft();
@@ -165,8 +169,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setPurpose,
     setOperation,
     setAnimalClass,
-    setSpecies,
-    setCustomSpeciesText,
+    selectBlueprintSpecies,
+    selectCustomSpecies,
     goTo,
     next,
     back,

@@ -444,6 +444,9 @@ export type Database = {
           notas: string | null
           organization_id: string
           precio_unitario: number | null
+          species_code_snapshot: string | null
+          species_display_name_snapshot: string | null
+          species_profile_id_snapshot: string | null
           tipo: Database["public"]["Enums"]["lote_evento_tipo"]
         }
         Insert: {
@@ -457,6 +460,9 @@ export type Database = {
           notas?: string | null
           organization_id: string
           precio_unitario?: number | null
+          species_code_snapshot?: string | null
+          species_display_name_snapshot?: string | null
+          species_profile_id_snapshot?: string | null
           tipo: Database["public"]["Enums"]["lote_evento_tipo"]
         }
         Update: {
@@ -470,6 +476,9 @@ export type Database = {
           notas?: string | null
           organization_id?: string
           precio_unitario?: number | null
+          species_code_snapshot?: string | null
+          species_display_name_snapshot?: string | null
+          species_profile_id_snapshot?: string | null
           tipo?: Database["public"]["Enums"]["lote_evento_tipo"]
         }
         Relationships: []
@@ -685,33 +694,36 @@ export type Database = {
         Row: {
           cantidad: number
           created_at: string
-          especie: string
           etapa: string
           id: string
           pedido_id: string
           precio_unitario: number
+          species_display_name_snapshot: string | null
+          species_profile_id_snapshot: string | null
           subtotal: number | null
           updated_at: string
         }
         Insert: {
           cantidad?: number
           created_at?: string
-          especie: string
           etapa: string
           id?: string
           pedido_id: string
           precio_unitario?: number
+          species_display_name_snapshot?: string | null
+          species_profile_id_snapshot?: string | null
           subtotal?: number | null
           updated_at?: string
         }
         Update: {
           cantidad?: number
           created_at?: string
-          especie?: string
           etapa?: string
           id?: string
           pedido_id?: string
           precio_unitario?: number
+          species_display_name_snapshot?: string | null
+          species_profile_id_snapshot?: string | null
           subtotal?: number | null
           updated_at?: string
         }
@@ -990,6 +1002,7 @@ export type Database = {
           notes: string | null
           scientific_name: string | null
           taxonomy_class: string | null
+          taxonomy_key: string | null
           updated_at: string
           workspace_id: string
         }
@@ -1003,6 +1016,7 @@ export type Database = {
           notes?: string | null
           scientific_name?: string | null
           taxonomy_class?: string | null
+          taxonomy_key?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -1016,6 +1030,7 @@ export type Database = {
           notes?: string | null
           scientific_name?: string | null
           taxonomy_class?: string | null
+          taxonomy_key?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -1038,7 +1053,6 @@ export type Database = {
           name: string
           organization_id: string
           purpose: string
-          species: string | null
           subtype: string | null
           updated_at: string
           user_id: string
@@ -1051,7 +1065,6 @@ export type Database = {
           name?: string
           organization_id: string
           purpose: string
-          species?: string | null
           subtype?: string | null
           updated_at?: string
           user_id: string
@@ -1064,7 +1077,6 @@ export type Database = {
           name?: string
           organization_id?: string
           purpose?: string
-          species?: string | null
           subtype?: string | null
           updated_at?: string
           user_id?: string

@@ -1,15 +1,11 @@
 /**
  * Workflow Action Types
- * 
- * Type definitions for operational workflow actions and results.
+ *
+ * All workflow inputs reference species via `speciesProfileId` exclusively.
  */
 
-import type { SpeciesId } from '../../lots/runtime/types';
-import type { CageStatus, CageType } from '../../cages/runtime/types';
-
-// ============================================================================
-// COMMON TYPES
-// ============================================================================
+import type { SpeciesProfileId } from "../lots/runtime/types";
+import type { CageStatus, CageType } from "../cages/runtime/types";
 
 export interface WorkflowContext {
   workspaceId: string;
@@ -29,19 +25,19 @@ export interface WorkflowResult<T = unknown> {
 export interface ValidationError {
   field: string;
   message: string;
-  severity: 'warning' | 'error';
+  severity: "warning" | "error";
 }
 
 // ============================================================================
-// CREATE LOT WORKFLOW
+// CREATE LOT
 // ============================================================================
 
 export interface CreateLotWorkflowInput {
-  speciesId: SpeciesId;
+  speciesProfileId: SpeciesProfileId;
   strain?: string;
-  sex: 'mixed' | 'male' | 'female';
+  sex: "mixed" | "male" | "female";
   quantity: number;
-  sourceType: 'internal_birth' | 'external_purchase' | 'transfer';
+  sourceType: "internal_birth" | "external_purchase" | "transfer";
   birthDate?: Date;
   acquisitionDate?: Date;
   cageId?: string;
@@ -56,11 +52,11 @@ export interface CreateLotWorkflowResult {
 }
 
 // ============================================================================
-// SUBDIVIDE LOT WORKFLOW
+// SUBDIVIDE LOT
 // ============================================================================
 
 export interface SubdivideLotSubdivision {
-  sex: 'mixed' | 'male' | 'female';
+  sex: "mixed" | "male" | "female";
   quantity: number;
   codeSuffix?: string;
   notes?: string;
@@ -79,14 +75,14 @@ export interface SubdivideLotWorkflowResult {
 }
 
 // ============================================================================
-// MOVE LOT WORKFLOW
+// MOVE LOT
 // ============================================================================
 
 export interface MoveLotWorkflowInput {
   lotId: string;
   fromCageId: string;
   toCageId: string;
-  quantity?: number; // If not specified, moves entire lot
+  quantity?: number;
   notes?: string;
 }
 
@@ -97,7 +93,7 @@ export interface MoveLotWorkflowResult {
 }
 
 // ============================================================================
-// ASSIGN LOT TO CAGE WORKFLOW
+// ASSIGN LOT TO CAGE
 // ============================================================================
 
 export interface AssignLotToCageWorkflowInput {
@@ -113,7 +109,7 @@ export interface AssignLotToCageWorkflowResult {
 }
 
 // ============================================================================
-// REGISTER MORTALITY WORKFLOW
+// MORTALITY
 // ============================================================================
 
 export interface RegisterMortalityWorkflowInput {
@@ -130,12 +126,12 @@ export interface RegisterMortalityWorkflowResult {
 }
 
 // ============================================================================
-// CREATE BREEDING GROUP WORKFLOW
+// BREEDING GROUP
 // ============================================================================
 
 export interface BreedingGroupMember {
   lotId: string;
-  role: 'male' | 'female';
+  role: "male" | "female";
   quantity: number;
 }
 
@@ -152,11 +148,13 @@ export interface CreateBreedingGroupWorkflowResult {
 }
 
 // ============================================================================
-// REGISTER LITTER WORKFLOW
+// LITTER
 // ============================================================================
 
 export interface RegisterLitterWorkflowInput {
   breedingGroupId: string;
+  /** Required so the new lot inherits the workspace's species profile. */
+  speciesProfileId: SpeciesProfileId;
   litterSize: number;
   liveBirths: number;
   stillbirths?: number;
@@ -171,11 +169,11 @@ export interface RegisterLitterWorkflowResult {
 }
 
 // ============================================================================
-// REGISTER WEANING WORKFLOW
+// WEANING
 // ============================================================================
 
 export interface WeaningSubdivision {
-  sex: 'mixed' | 'male' | 'female';
+  sex: "mixed" | "male" | "female";
   quantity: number;
   notes?: string;
 }
@@ -194,7 +192,7 @@ export interface RegisterWeaningWorkflowResult {
 }
 
 // ============================================================================
-// CAGE & OCCUPANCY TYPES
+// CAGE & SUMMARY TYPES
 // ============================================================================
 
 export interface CageSummary {
@@ -211,18 +209,14 @@ export interface CageSummary {
 export interface LotSummary {
   id: string;
   code: string;
-  speciesId: SpeciesId;
+  speciesProfileId: SpeciesProfileId;
   strain?: string;
-  sex: 'mixed' | 'male' | 'female';
+  sex: "mixed" | "male" | "female";
   currentQuantity: number;
   status: string;
   location?: string;
   cageId?: string;
 }
-
-// ============================================================================
-// ACTIVITY & FEEDBACK TYPES
-// ============================================================================
 
 export interface OperationalActivity {
   id: string;
@@ -235,11 +229,11 @@ export interface OperationalActivity {
 
 export interface OperationalAlert {
   id: string;
-  type: 'warning' | 'error' | 'info';
+  type: "warning" | "error" | "info";
   title: string;
   message: string;
   relatedEntityId?: string;
-  relatedEntityType?: 'lot' | 'cage' | 'breeding_group' | 'litter';
+  relatedEntityType?: "lot" | "cage" | "breeding_group" | "litter";
   timestamp: Date;
   acknowledged?: boolean;
 }
