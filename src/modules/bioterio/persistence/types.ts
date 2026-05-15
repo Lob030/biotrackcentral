@@ -5,7 +5,7 @@
  * These types bridge the runtime system with Supabase storage.
  */
 
-import type { Lot, LotStatus, LotSexType, LotSourceType, SpeciesId } from '../lots/runtime/types';
+import type { Lot, LotStatus, LotSexType, LotSourceType } from '../lots/runtime/types';
 import type { Cage, CageStatus, CageMovement, LotAssignment } from '../cages/runtime/types';
 
 // ============================================================================
@@ -24,7 +24,7 @@ export interface LotRecord {
   code: string;
   
   // Biological attributes
-  species_id: SpeciesId;
+  species_profile_id: string;
   strain?: string;
   sex: LotSexType;
   
@@ -213,7 +213,7 @@ export interface BreedingGroupRecord {
   dam_count: number;
   
   // Breeding parameters
-  species_id: SpeciesId;
+  species_profile_id: string;
   strain?: string;
   breeding_protocol?: string;
   target_offspring_count?: number;
@@ -370,7 +370,7 @@ export interface CurrentLotStateProjection {
   
   // Current state
   code: string;
-  species_id: SpeciesId;
+  species_profile_id: string;
   strain?: string;
   sex: LotSexType;
   current_quantity: number;
@@ -451,7 +451,7 @@ export interface ActiveBreedingGroupsProjection {
   
   // Group identity
   code: string;
-  species_id: SpeciesId;
+  species_profile_id: string;
   strain?: string;
   
   // Current state

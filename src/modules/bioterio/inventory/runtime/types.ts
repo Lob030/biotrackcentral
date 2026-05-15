@@ -82,8 +82,10 @@ export interface InventorySnapshotSummary {
 export interface InventoryClassificationState {
   // Identity
   speciesProfileId: string;
-  speciesName: string;
-  operationalName: string;
+  /** Display name resolved from workspace_species_profiles.display_name (UI only). */
+  speciesDisplayName: string;
+  /** Lower-cased canonical taxonomy code (cross-workspace aggregation). */
+  taxonomyKey: string;
   sizeClassId: string;
   sizeClassName: string;
   sizeClassCode?: string;
@@ -356,8 +358,7 @@ export interface AvailabilityValidationIssue {
 export interface LotForAvailability {
   id: string;
   codigo: string | null;
-  especie: string;
-  species_id?: string;
+  species_profile_id: string;
   size_class_id: string | null;
   cantidad_actual: number | null;
   fecha_nacimiento: string | null;
@@ -366,7 +367,7 @@ export interface LotForAvailability {
   // Resolved joins
   size_class?: {
     id: string;
-    name: string;
+    display_name: string;
     code?: string;
     species_profile_id: string;
     sale_price?: number | null;
@@ -376,8 +377,9 @@ export interface LotForAvailability {
   } | null;
   species_profile?: {
     id: string;
-    species_name: string;
-    operational_name: string;
+    code: string;
+    display_name: string;
+    taxonomy_key: string;
   } | null;
 }
 
