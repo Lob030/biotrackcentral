@@ -18,8 +18,9 @@ function WizardInner() {
     try {
       await confirm();
       navigate("/dashboard?onboarding_complete=true", { replace: true });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "No se pudo crear el entorno.";
+    } catch (err: any) {
+      console.error("Onboarding confirmation error:", err);
+      const msg = err?.message || (typeof err === 'string' ? err : "No se pudo crear el entorno.");
       toast.error(msg);
     }
   };

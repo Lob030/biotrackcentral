@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Scissors, GitFork, Skull, DollarSign, ArrowRightLeft, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Scissors, GitFork, Skull, DollarSign, ArrowRightLeft, Eye, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { Link } from "react-router-dom";
@@ -23,6 +23,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Layers as LayersIcon } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useSpeciesProfiles } from "../species/data";
+import { getActiveWorkspaceId } from "@/lib/workspace";
+import { seedWorkspaceSpecies } from "../species/data/initialization";
 
 interface Lote {
   id: string;
@@ -60,15 +62,53 @@ export default function Lotes() {
   const [eventoLote, setEventoLote] = useState<Lote | null>(null);
   const [eventoTipo, setEventoTipo] = useState<EventoTipo>("mortalidad");
 
-  const { data: speciesProfiles = [] } = useSpeciesProfiles(profile?.workspace_id || "");
+  const workspaceId = getActiveWorkspaceId() ?? profile?.workspace_id ?? "";
+  const { data: speciesProfiles = [], isLoading: loadingSpecies, refetch: refetchSpecies } = useSpeciesProfiles(workspaceId);
+  const activeSpecies = speciesProfiles.filter(p => p.isActive);
+
+  // Get workspace metadata for auto-seed fallback
+  const { data: workspaceMetadata } = useQuery({
+    queryKey: ["workspace-metadata", workspaceId],
+    enabled: !!workspaceId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("workspaces").select("*").eq("id", workspaceId).single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const [isSeeding, setIsSeeding] = useState(false);
+  const handleAutoSeed = async () => {
+    if (!workspaceMetadata?.species) {
+      toast.error("No se encontró especie configurada en el espacio");
+      return;
+    }
+    setIsSeeding(true);
+    try {
+      await seedWorkspaceSpecies(workspaceId, workspaceMetadata.species);
+      toast.success("Perfil de especie inicializado correctamente");
+      refetchSpecies();
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
-    codigo: "", tipo: "nacimiento" as const, especie: "Raton",
+    codigo: "", tipo: "nacimiento" as const, especie: "",
     linea_genetica_id: "", caja_id: "",
     fecha_nacimiento: today, fecha_introduccion_caja: "",
     cantidad_inicial: "", cantidad_actual: "", machos: "", hembras: "", notas: "",
   });
+
+  // Set default species once loaded
+  useEffect(() => {
+    if (activeSpecies.length > 0 && !form.especie) {
+      setForm(f => ({ ...f, especie: activeSpecies[0].operationalName }));
+    }
+  }, [activeSpecies, form.especie]);
 
   const lotesQuery = useLotesList({ estado: filterEstado }) as ReturnType<typeof useLotesList> & { data: Lote[] };
   const lotes = (lotesQuery.data ?? []) as Lote[];
@@ -208,8 +248,20 @@ export default function Lotes() {
 
       {lotesError ? (
         <ErrorState error={lotesError} onRetry={() => lotesQuery.refetch()} />
-      ) : isLoading ? (
+      ) : isLoading || loadingSpecies ? (
         <ListSkeleton rows={5} />
+      ) : activeSpecies.length === 0 ? (
+        <div className="col-span-full glass-card p-12 text-center">
+          <p className="text-muted-foreground mb-4">No hay perfiles de especie activos en este espacio.</p>
+          {workspaceMetadata?.species ? (
+            <Button onClick={handleAutoSeed} disabled={isSeeding} variant="outline">
+              {isSeeding ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Inicializar runtime para: {workspaceMetadata.species}
+            </Button>
+          ) : (
+            <p className="text-xs text-destructive">Error: Espacio no configurado correctamente.</p>
+          )}
+        </div>
       ) : (
         <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-70" : ""}`}>
           {filtered.map((l) => {
