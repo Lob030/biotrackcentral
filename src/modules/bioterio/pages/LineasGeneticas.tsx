@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import {
@@ -18,6 +18,11 @@ import {
 } from "@/modules/bioterio/data/lineasGeneticas";
 import type { LineaGeneticaRow } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { getActiveWorkspaceId } from "@/lib/workspace";
+import { useSpeciesProfiles } from "@/modules/bioterio/species/data";
+import { seedWorkspaceSpecies } from "@/modules/bioterio/species/data/initialization";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const COLORS = ["#06b6d4", "#10b981", "#a855f7", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899", "#f97316", "#14b8a6", "#8b5cf6"];
 
@@ -31,14 +36,56 @@ export default function LineasGeneticas() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Linea | null>(null);
 
+  // Workspace-scoped species profiles
+  const workspaceId = getActiveWorkspaceId() ?? "";
+  const { data: speciesProfiles = [], isLoading: loadingSpecies, refetch: refetchSpecies } = useSpeciesProfiles(workspaceId);
+  const activeSpecies = speciesProfiles.filter(p => p.isActive);
+
+  // Get workspace metadata for auto-seed fallback
+  const { data: workspaceMetadata } = useQuery({
+    queryKey: ["workspace-metadata", workspaceId],
+    enabled: !!workspaceId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("workspaces").select("*").eq("id", workspaceId).single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const [form, setForm] = useState({
     nombre: "",
-    especie: "Raton" as "ASF" | "Raton" | "Rata",
+    especie: "",
     origen: "",
     fecha_registro: new Date().toISOString().slice(0, 10),
     color_etiqueta: COLORS[0],
     notas: "",
   });
+
+  // Set default species once loaded
+  useEffect(() => {
+    if (activeSpecies.length > 0 && !form.especie) {
+      console.log("Setting default species in form:", activeSpecies[0].operationalName);
+      setForm(f => ({ ...f, especie: activeSpecies[0].operationalName }));
+    }
+  }, [activeSpecies, form.especie]);
+
+  const [isSeeding, setIsSeeding] = useState(false);
+  const handleAutoSeed = async () => {
+    if (!workspaceMetadata?.species) {
+      toast.error("No se encontró especie configurada en el espacio");
+      return;
+    }
+    setIsSeeding(true);
+    try {
+      await seedWorkspaceSpecies(workspaceId, workspaceMetadata.species);
+      toast.success("Perfil de especie inicializado correctamente");
+      refetchSpecies();
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   const { data: lineas = [] } = useLineasList();
   const { data: lotesCount = {} } = useLineasIndividuosCount();
@@ -70,7 +117,15 @@ export default function LineasGeneticas() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ nombre: "", especie: "Raton", origen: "", fecha_registro: new Date().toISOString().slice(0, 10), color_etiqueta: COLORS[0], notas: "" });
+    const defaultSpecies = activeSpecies.length > 0 ? activeSpecies[0].operationalName : "";
+    setForm({ 
+      nombre: "", 
+      especie: defaultSpecies, 
+      origen: "", 
+      fecha_registro: new Date().toISOString().slice(0, 10), 
+      color_etiqueta: COLORS[0], 
+      notas: "" 
+    });
     setOpen(true);
   };
 
@@ -115,15 +170,31 @@ export default function LineasGeneticas() {
           <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las especies</SelectItem>
-            <SelectItem value="ASF">ASF</SelectItem>
-            <SelectItem value="Raton">Ratón</SelectItem>
-            <SelectItem value="Rata">Rata</SelectItem>
+            {activeSpecies.map((sp) => (
+              <SelectItem key={sp.id} value={sp.operationalName}>{sp.operationalName}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((l) => (
+        {loadingSpecies ? (
+          <div className="col-span-full py-12 flex justify-center">
+            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : activeSpecies.length === 0 ? (
+          <div className="col-span-full glass-card p-12 text-center">
+            <p className="text-muted-foreground mb-4">No hay perfiles de especie activos en este espacio.</p>
+            {workspaceMetadata?.species ? (
+              <Button onClick={handleAutoSeed} disabled={isSeeding} variant="outline">
+                {isSeeding ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Inicializar runtime para: {workspaceMetadata.species}
+              </Button>
+            ) : (
+              <p className="text-xs text-destructive">Error: Espacio no configurado correctamente.</p>
+            )}
+          </div>
+        ) : filtered.map((l) => (
           <div key={l.id} className="glass-card p-5 group hover:border-primary/40 transition">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-1.5 self-stretch rounded-full" style={{ background: l.color_etiqueta ?? "#06b6d4" }} />
@@ -150,7 +221,7 @@ export default function LineasGeneticas() {
             </div>
           </div>
         ))}
-        {filtered.length === 0 && (
+        {!loadingSpecies && filtered.length === 0 && activeSpecies.length > 0 && (
           <div className="col-span-full glass-card p-12 text-center text-muted-foreground">
             No hay líneas que coincidan. <button onClick={openNew} className="text-primary hover:underline">Crear una</button>
           </div>
@@ -168,12 +239,12 @@ export default function LineasGeneticas() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Especie *</Label>
-                <Select value={form.especie} onValueChange={(v: any) => setForm({ ...form, especie: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={form.especie} onValueChange={(v) => setForm({ ...form, especie: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona especie" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Raton">Ratón</SelectItem>
-                    <SelectItem value="Rata">Rata</SelectItem>
-                    <SelectItem value="ASF">ASF</SelectItem>
+                    {activeSpecies.map((sp) => (
+                      <SelectItem key={sp.id} value={sp.operationalName}>{sp.operationalName}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

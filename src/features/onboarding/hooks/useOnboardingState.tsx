@@ -131,7 +131,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }
 
     let animalClass: AnimalClass = "Mamíferos"; // Default fallback
-    if (species === "insectos") {
+    if (species === "tenebrios") {
       animalClass = "Artrópodos";
     }
 

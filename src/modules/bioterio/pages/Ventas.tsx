@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getActiveWorkspaceId } from "@/lib/workspace";
+import { useSpeciesProfiles } from "../species/data";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,12 +41,7 @@ const PERIODOS: { value: Periodo; label: string }[] = [
   { value: "anio", label: "Este año" },
 ];
 
-const ESPECIE_COLOR: Record<string, string> = {
-  ASF: "#06b6d4",
-  Ratón: "#a855f7",
-  Raton: "#a855f7",
-  Rata: "#f59e0b",
-};
+const FALLBACK_COLORS = ["#06b6d4", "#a855f7", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#ec4899", "#f97316"];
 
 const ESTADO_BADGE: Record<string, string> = {
   pendiente: "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
@@ -125,7 +122,15 @@ export default function Ventas() {
   const orgId = profile?.organization_id;
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [topMetric, setTopMetric] = useState<"unidades" | "ingreso">("unidades");
-  const [topEspecie, setTopEspecie] = useState<"todas" | "ASF" | "Ratón" | "Rata">("todas");
+  const workspaceId = getActiveWorkspaceId() ?? "";
+  const { data: speciesProfiles = [] } = useSpeciesProfiles(workspaceId);
+  const activeSpecies = speciesProfiles.filter(p => p.isActive);
+  const speciesColorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    activeSpecies.forEach((sp, i) => { map[sp.operationalName] = FALLBACK_COLORS[i % FALLBACK_COLORS.length]; });
+    return map;
+  }, [activeSpecies]);
+  const [topEspecie, setTopEspecie] = useState<string>("todas");
 
   const r = useMemo(() => rangoPeriodo(periodo), [periodo]);
 
@@ -257,7 +262,7 @@ export default function Ventas() {
       unidades: v.unidades,
       ingreso: Math.round(v.ingreso * 100) / 100,
       pct: totalUnidades > 0 ? (v.unidades / totalUnidades) * 100 : 0,
-      color: ESPECIE_COLOR[nombre] ?? "#64748b",
+      color: speciesColorMap[nombre] ?? "#64748b",
     }));
 
     const recientes = pedActuales.slice(0, 10);
@@ -417,15 +422,23 @@ export default function Ventas() {
                   ))}
                 </div>
                 <div className="flex gap-1 rounded-md border border-border p-0.5">
-                  {(["todas", "ASF", "Ratón", "Rata"] as const).map((e) => (
+                  <button
+                    onClick={() => setTopEspecie("todas")}
+                    className={`px-2.5 py-1 text-xs rounded ${
+                      topEspecie === "todas" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {activeSpecies.map((sp) => (
                     <button
-                      key={e}
-                      onClick={() => setTopEspecie(e)}
+                      key={sp.id}
+                      onClick={() => setTopEspecie(sp.operationalName)}
                       className={`px-2.5 py-1 text-xs rounded ${
-                        topEspecie === e ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                        topEspecie === sp.operationalName ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                       }`}
                     >
-                      {e === "todas" ? "Todas" : e}
+                      {sp.operationalName}
                     </button>
                   ))}
                 </div>
@@ -449,7 +462,7 @@ export default function Ventas() {
                       />
                       <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
                         {procesado.productos.map((p, i) => (
-                          <Cell key={i} fill={ESPECIE_COLOR[p.especie] ?? "#64748b"} />
+                          <Cell key={i} fill={speciesColorMap[p.especie] ?? "#64748b"} />
                         ))}
                       </Bar>
                     </BarChart>
