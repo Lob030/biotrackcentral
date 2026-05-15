@@ -200,7 +200,7 @@ function buildSnapshotSummary(
     .map((s) => ({
       speciesProfileId: s.speciesProfileId,
       sizeClassId: s.sizeClassId,
-      speciesName: s.speciesName,
+      speciesDisplayName: s.speciesDisplayName, taxonomyKey: s.taxonomyKey,
       sizeClassName: s.sizeClassName,
       currentAvailable: s.available,
       threshold: lowStockThreshold,
@@ -312,8 +312,8 @@ export function getProjectedAvailability(
           date: targetDayStr,
           speciesProfileId: profileId,
           sizeClassId: sizeClass.id,
-          sizeClassName: sizeClass.name,
-          speciesName: profileLots[0].species_profile?.species_name ?? '',
+          sizeClassName: sizeClass.display_name,
+          speciesName: profileLots[0].species_profile?.display_name ?? '',
           projectedQuantity,
           confidence: dayOffset < 7 ? 'high' : dayOffset < 14 ? 'medium' : 'low',
           sourceLotIds: contributingLots.map((l) => l.id),
@@ -330,8 +330,8 @@ export function getProjectedAvailability(
       timelines.push({
         speciesProfileId: profileId,
         sizeClassId: sizeClass.id,
-        speciesName: profileLots[0].species_profile?.species_name ?? '',
-        sizeClassName: sizeClass.name,
+        speciesName: profileLots[0].species_profile?.display_name ?? '',
+        sizeClassName: sizeClass.display_name,
         dailyProjections,
         peakWindow,
       });
@@ -539,7 +539,7 @@ export function validateAvailability(
         severity: 'error',
         speciesProfileId: state.speciesProfileId,
         sizeClassId: state.sizeClassId,
-        message: `Sobre-reserva detectada: ${state.reserved} reservados pero solo ${state.totalAnimals} animales disponibles en ${state.speciesName} - ${state.sizeClassName}.`,
+        message: `Sobre-reserva detectada: ${state.reserved} reservados pero solo ${state.totalAnimals} animales disponibles en ${state.speciesDisplayName} - ${state.sizeClassName}.`,
       });
     }
 
@@ -550,7 +550,7 @@ export function validateAvailability(
         severity: 'error',
         speciesProfileId: state.speciesProfileId,
         sizeClassId: state.sizeClassId,
-        message: `Disponibilidad negativa (${state.available}) en ${state.speciesName} - ${state.sizeClassName}.`,
+        message: `Disponibilidad negativa (${state.available}) en ${state.speciesDisplayName} - ${state.sizeClassName}.`,
       });
     }
   }
@@ -703,7 +703,7 @@ export function getAvailabilityTimeline(
   return projection.timelines
     .flatMap((t) => t.dailyProjections)
     .filter((p) => p.date === targetDate)
-    .sort((a, b) => a.speciesName.localeCompare(b.speciesName));
+    .sort((a, b) => a.speciesDisplayName.localeCompare(b.speciesDisplayName));
 }
 
 /**
