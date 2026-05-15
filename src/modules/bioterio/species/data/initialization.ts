@@ -1,89 +1,122 @@
 /**
- * Workspace Initialization Data Layer
- * 
- * Handles seeding workspaces with initial species profiles and settings.
+ * Workspace species initialization.
+ *
+ * Strict registry-based seeding. No fallback. No silent skip.
+ * - `blueprint` seeds: create profile + size classes + operational settings
+ *   from `findBlueprintByTaxonomyKey`.
+ * - `custom` seeds: create a minimal profile only; operator configures size
+ *   classes/settings later via the UI.
+ *
+ * If a blueprint is missing or the DB insert fails, this throws so the
+ * workspace creation flow can roll back.
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { createSpeciesProfile, addSizeClass } from "./index";
-import { 
-  TENEBRIO_STARTER_BLUEPRINT, 
-  TENEBRIO_DEFAULT_SIZE_CLASSES,
-  TENEBRIO_DEFAULT_OPERATIONAL_SETTINGS,
-  ASF_STARTER_BLUEPRINT,
-  ASF_DEFAULT_SIZE_CLASSES,
-  ASF_DEFAULT_OPERATIONAL_SETTINGS
-} from "../runtime/types";
+import type { SpeciesSeed } from "@/features/onboarding/lib/types";
+import { findBlueprintByTaxonomyKey } from "./blueprintRegistry";
 
-export async function seedWorkspaceSpecies(workspaceId: string, speciesId: string) {
-  let blueprint: any;
-  let sizeClasses: any[];
-  let settings: any;
-
-  const id = speciesId.toLowerCase();
-
-  if (id === 'tenebrios') {
-    blueprint = TENEBRIO_STARTER_BLUEPRINT;
-    sizeClasses = TENEBRIO_DEFAULT_SIZE_CLASSES;
-    settings = TENEBRIO_DEFAULT_OPERATIONAL_SETTINGS;
-  } else if (id === 'asf') {
-    blueprint = ASF_STARTER_BLUEPRINT;
-    sizeClasses = ASF_DEFAULT_SIZE_CLASSES;
-    settings = ASF_DEFAULT_OPERATIONAL_SETTINGS;
-  } else {
-    // Default to ASF if unknown for now, or skip
-    console.warn(`Unknown species ID: ${speciesId}. Skipping seeding.`);
-    return;
+export async function seedWorkspaceSpecies(
+  workspaceId: string,
+  seed: SpeciesSeed,
+): Promise<{ speciesProfileId: string }> {
+  if (seed.kind === "custom") {
+    return seedCustom(workspaceId, seed.displayName);
   }
+  return seedBlueprint(workspaceId, seed.taxonomyKey);
+}
 
-  // 1. Create Species Profile
-  const profile = await createSpeciesProfile({
-    workspaceId,
-    speciesId: blueprint.speciesId,
-    speciesName: blueprint.speciesName,
-    operationalName: blueprint.operationalName,
-    scientificName: blueprint.scientificName,
-    description: blueprint.description,
-    isStarterBlueprint: true,
-  });
+async function seedCustom(
+  workspaceId: string,
+  displayName: string,
+): Promise<{ speciesProfileId: string }> {
+  const code = displayName.trim();
+  if (!code) throw new Error("Custom species displayName is required");
 
-  // 2. Add Size Classes
-  for (const sc of sizeClasses) {
-    await addSizeClass({
-      workspaceId,
-      speciesProfileId: profile.id,
-      name: sc.name,
-      code: sc.code,
-      minWeightGrams: sc.minWeightGrams,
-      maxWeightGrams: sc.maxWeightGrams,
-      minAgeDays: sc.minAgeDays,
-      maxAgeDays: sc.maxAgeDays,
-      salePrice: sc.salePrice,
-      costPrice: sc.costPrice,
-      displayOrder: sc.displayOrder,
-      isDefault: sc.isDefault,
-    });
-  }
-
-  // 3. Add Operational Settings
-  const { error: settingsError } = await supabase
-    .from("species_operational_settings")
+  const { data, error } = await supabase
+    .from("workspace_species_profiles")
     .insert({
       workspace_id: workspaceId,
+      code,
+      display_name: code,
+      capability_profile: {},
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to create custom species profile");
+  }
+  return { speciesProfileId: data.id };
+}
+
+async function seedBlueprint(
+  workspaceId: string,
+  taxonomyKey: string,
+): Promise<{ speciesProfileId: string }> {
+  const blueprint = findBlueprintByTaxonomyKey(taxonomyKey);
+  if (!blueprint) {
+    throw new Error(`Unknown species blueprint: ${taxonomyKey}`);
+  }
+
+  // 1. Profile
+  const { data: profile, error: pErr } = await supabase
+    .from("workspace_species_profiles")
+    .insert({
+      workspace_id: workspaceId,
+      code: blueprint.code,
+      display_name: blueprint.displayName,
+      scientific_name: blueprint.scientificName ?? null,
+      capability_profile: blueprint.profile.capabilities as unknown as Record<string, unknown>,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  if (pErr || !profile) {
+    throw new Error(pErr?.message ?? "Failed to insert species profile");
+  }
+
+  // 2. Size classes
+  if (blueprint.sizeClasses.length > 0) {
+    const rows = blueprint.sizeClasses.map((sc, idx) => ({
       species_profile_id: profile.id,
-      breeding_cycle_days: settings.breedingCycleDays,
-      expected_weaning_age_days: settings.expectedWeaningAgeDays,
-      expected_gestation_days: settings.expectedGestationDays,
-      maturity_age_days: settings.maturityAgeDays,
-      expected_birth_weight_grams: settings.expectedBirthWeightGrams,
-      expected_adult_weight_grams: settings.expectedAdultWeightGrams,
-      expected_mortality_rate: settings.expectedMortalityRate,
-      expected_growth_curve: settings.expectedGrowthCurve,
-      default_sex_ratio: settings.defaultSexRatio,
-      typical_litter_size: settings.typicalLitterSize,
-    });
+      code: sc.code ?? sc.name.slice(0, 6).toUpperCase(),
+      display_name: sc.name,
+      display_order: sc.displayOrder ?? idx + 1,
+      min_age_days: sc.minAgeDays ?? null,
+      max_age_days: sc.maxAgeDays ?? null,
+      min_weight_g: sc.minWeightGrams ?? null,
+      max_weight_g: sc.maxWeightGrams ?? null,
+      is_default: sc.isDefault ?? false,
+      is_sale_eligible: true,
+      metadata: { description: sc.description ?? null, salePrice: sc.salePrice ?? null },
+    }));
+    const { error: scErr } = await supabase.from("species_size_classes").insert(rows);
+    if (scErr) throw new Error(scErr.message);
+  }
 
-  if (settingsError) throw settingsError;
+  // 3. Operational settings
+  const { error: setErr } = await supabase.from("species_operational_settings").insert({
+    species_profile_id: profile.id,
+    quantity_unit: blueprint.profile.capabilities.operationalQuantityUnit ?? "individuals",
+    lot_tracking_mode: "individual",
+    track_breeding: true,
+    track_mortality: true,
+    default_breeding_cycle_days: blueprint.settings.breedingCycleDays ?? null,
+    weaning_age_days: blueprint.settings.expectedWeaningAgeDays ?? null,
+    settings: {
+      expectedGestationDays: blueprint.settings.expectedGestationDays,
+      maturityAgeDays: blueprint.settings.maturityAgeDays,
+      expectedBirthWeightGrams: blueprint.settings.expectedBirthWeightGrams,
+      expectedAdultWeightGrams: blueprint.settings.expectedAdultWeightGrams,
+      expectedMortalityRate: blueprint.settings.expectedMortalityRate,
+      expectedGrowthCurve: blueprint.settings.expectedGrowthCurve,
+      defaultSexRatio: blueprint.settings.defaultSexRatio,
+      typicalLitterSize: blueprint.settings.typicalLitterSize,
+    },
+  });
+  if (setErr) throw new Error(setErr.message);
 
-  return profile;
+  return { speciesProfileId: profile.id };
 }

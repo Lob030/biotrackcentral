@@ -12,9 +12,14 @@ export default function WorkspaceSummary({ onConfirm }: Props) {
   const { purpose, operation, goTo, buildDraft, isSubmitting } = useOnboardingState();
   const draft = buildDraft();
   const purposeLabel = PURPOSE_OPTIONS.find((o) => o.value === purpose)?.label ?? "—";
-  const speciesLabel = draft.species ?? "No especificada";
-  
-  const blueprint = OPERATIONAL_BLUEPRINTS.find(bp => bp.id === operation);
+
+  const speciesLabel = draft.speciesSeed
+    ? draft.speciesSeed.kind === "blueprint"
+      ? `${draft.speciesSeed.displayName} (blueprint)`
+      : `${draft.speciesSeed.displayName} (personalizada)`
+    : "No especificada";
+
+  const blueprint = OPERATIONAL_BLUEPRINTS.find((bp) => bp.id === operation);
   const operationName = blueprint?.name ?? "—";
   const modulesList = blueprint?.modules.join(", ") ?? "—";
 
@@ -35,7 +40,9 @@ export default function WorkspaceSummary({ onConfirm }: Props) {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold">Inicialización Operacional</h2>
-        <p className="text-muted-foreground mt-1">Revisa la configuración de tu entorno operacional antes de crearlo.</p>
+        <p className="text-muted-foreground mt-1">
+          Revisa la configuración de tu entorno operacional antes de crearlo.
+        </p>
       </div>
 
       <Card className="p-4 divide-y">

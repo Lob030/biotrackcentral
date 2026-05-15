@@ -1,9 +1,9 @@
 /**
- * Zod schemas for each operational intent.
- * Mirror of supabase/functions/_shared/bioterio-ai-schemas.ts.
+ * Zod schemas for AI intents.
  *
- * Args here are minimal — they reference entities by user-facing code/name.
- * The runtime resolver maps them to internal IDs before execution.
+ * Species reference is `speciesProfileId` (UUID) plus optional `speciesName`
+ * (the user-spoken display string used purely for the resolver to suggest
+ * disambiguation candidates — never used in execution logic).
  */
 import { z } from "zod";
 import type { IntentName } from "./intents";
@@ -13,10 +13,12 @@ const qty = z.number().int().positive().max(100_000);
 const sex = z.enum(["mixed", "male", "female"]);
 const sourceType = z.enum(["internal_birth", "external_purchase", "transfer"]);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const uuid = z.string().uuid();
 
 export const IntentSchemas = {
   CREATE_LOT: z.object({
-    speciesId: z.string().trim().min(1).max(60),
+    speciesProfileId: uuid,
+    speciesName: z.string().trim().max(120).optional(),
     strain: z.string().trim().max(120).optional(),
     sex,
     quantity: qty,

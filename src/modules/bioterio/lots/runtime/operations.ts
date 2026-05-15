@@ -1,104 +1,71 @@
 /**
  * Bioterio Lot Runtime - Core Operations
- * 
- * Implements the fundamental lot-centric operations for the bioterio.
- * This is the operational foundation that treats LOTS as the primary entity,
- * not individual animals.
+ *
+ * In-memory lot operations. Lots are species-profile-scoped exclusively;
+ * the resolver injects display data when needed for UI. No string-species
+ * fallbacks anywhere in this layer.
  */
 
 import type {
   Lot,
   LotStatus,
-  LotSourceType,
-  LotSexType,
-  SpeciesId,
   LotLineage,
   LotSubdivision,
   LotLifecycleEvent,
-  LotLifecycleEventType,
   CreateLotOptions,
   SubdivideLotOptions,
   LotQueryFilters,
   LotSummary,
-} from './types';
+  SpeciesProfileId,
+} from "./types";
 
-/**
- * In-memory lot store (for demonstration/runtime purposes)
- * In production, this would be backed by a database
- */
 class LotStore {
   private lots: Map<string, Lot> = new Map();
   private events: Map<string, LotLifecycleEvent[]> = new Map();
 
-  save(lot: Lot): void {
-    this.lots.set(lot.id, lot);
-  }
-
-  get(id: string): Lot | undefined {
-    return this.lots.get(id);
-  }
-
-  getAll(): Lot[] {
-    return Array.from(this.lots.values());
-  }
-
-  delete(id: string): boolean {
-    return this.lots.delete(id);
-  }
-
+  save(lot: Lot): void { this.lots.set(lot.id, lot); }
+  get(id: string): Lot | undefined { return this.lots.get(id); }
+  getAll(): Lot[] { return Array.from(this.lots.values()); }
+  delete(id: string): boolean { return this.lots.delete(id); }
   addEvent(event: LotLifecycleEvent): void {
-    const lotEvents = this.events.get(event.lotId) || [];
-    lotEvents.push(event);
-    this.events.set(event.lotId, lotEvents);
+    const arr = this.events.get(event.lotId) ?? [];
+    arr.push(event);
+    this.events.set(event.lotId, arr);
   }
-
   getEvents(lotId: string): LotLifecycleEvent[] {
-    return this.events.get(lotId) || [];
+    return this.events.get(lotId) ?? [];
   }
 }
 
-// Global store instance
 const store = new LotStore();
 
-/**
- * Generate a unique ID for lots and events
- */
-function generateId(): string {
-  return crypto.randomUUID();
-}
+function generateId(): string { return crypto.randomUUID(); }
 
 /**
- * Generate a human-readable lot code
- * Format: [STRAIN_PREFIX]-[SEQUENCE]
- * Example: ASF-001, C57-042
+ * Generate a human-readable lot code. The species-profile-driven prefix is
+ * resolved upstream and passed in as `strain`; if the caller does not
+ * provide one we fall back to a generic LOT prefix — never a species alias.
  */
-function generateLotCode(speciesId: SpeciesId, strain?: string): string {
-  const prefix = strain ? strain.substring(0, 3).toUpperCase() : speciesId.substring(0, 3).toUpperCase();
-  const sequence = Math.floor(Math.random() * 900) + 100; // 100-999
-  return `${prefix}-${sequence}`;
+function generateLotCode(strain?: string): string {
+  const prefix = strain ? strain.substring(0, 3).toUpperCase() : "LOT";
+  const seq = Math.floor(Math.random() * 900) + 100;
+  return `${prefix}-${seq}`;
 }
 
-/**
- * Create a new lot
- * 
- * This is the primary entry point for creating lots in the system.
- * Supports all source types: internal_birth, external_purchase, transfer
- */
 export function createLot(options: CreateLotOptions): Lot {
+  if (!options.speciesProfileId) {
+    throw new Error("createLot: speciesProfileId is required");
+  }
   const now = new Date();
   const id = generateId();
-  const code = generateLotCode(options.speciesId, options.strain);
+  const code = generateLotCode(options.strain);
 
-  // Build lineage based on source type
   let lineage: LotLineage;
-  
   if (options.originLotId) {
-    // This lot came from a subdivision or transfer
-    const originLot = store.get(options.originLotId);
-    const ancestors = originLot 
-      ? [...originLot.lineage.ancestors, options.originLotId]
+    const origin = store.get(options.originLotId);
+    const ancestors = origin
+      ? [...origin.lineage.ancestors, options.originLotId]
       : [options.originLotId];
-    
     lineage = {
       lotId: id,
       originLotId: options.originLotId,
@@ -108,7 +75,6 @@ export function createLot(options: CreateLotOptions): Lot {
       generationDepth: ancestors.length,
     };
   } else {
-    // This is a root lot (internal birth or external purchase)
     lineage = {
       lotId: id,
       sourceType: options.sourceType,
@@ -121,7 +87,7 @@ export function createLot(options: CreateLotOptions): Lot {
   const lot: Lot = {
     id,
     code,
-    speciesId: options.speciesId,
+    speciesProfileId: options.speciesProfileId,
     strain: options.strain,
     sex: options.sex,
     initialQuantity: options.quantity,
@@ -133,7 +99,7 @@ export function createLot(options: CreateLotOptions): Lot {
     sourceType: options.sourceType,
     originLotId: options.originLotId,
     supplierName: options.supplierName,
-    status: 'active',
+    status: "active",
     location: options.location,
     lineage,
     notes: options.notes,
@@ -141,109 +107,75 @@ export function createLot(options: CreateLotOptions): Lot {
     sizeClassId: options.sizeClassId,
   };
 
-  // Save the lot
   store.save(lot);
-
-  // Record creation event
-  const event: LotLifecycleEvent = {
+  store.addEvent({
     id: generateId(),
     lotId: id,
-    eventType: 'created',
+    eventType: "created",
     timestamp: now,
     quantity: options.quantity,
     reason: `Lot created via ${options.sourceType}`,
     metadata: {
-      speciesId: options.speciesId,
+      speciesProfileId: options.speciesProfileId,
       sex: options.sex,
       strain: options.strain,
     },
-  };
-  store.addEvent(event);
+  });
 
   return lot;
 }
 
-/**
- * Subdivide a lot into multiple child lots
- * 
- * This is a CORE OPERATION in the lot-centric model.
- * When a lot is subdivided:
- * 1. The original lot's status changes to 'subdivided'
- * 2. New child lots are created with preserved lineage
- * 3. Quantity is distributed among child lots
- * 4. Historical traceability is maintained
- * 
- * Example:
- * Original: ASF-001 (mixed, 20 animals)
- * After subdivision:
- *   - ASF-001-M (male, 10 animals)
- *   - ASF-001-F (female, 10 animals)
- *   - ASF-001 status -> 'subdivided'
- */
-export function subdivideLot(options: SubdivideLotOptions): {
-  parentLot: Lot;
-  childLots: Lot[];
-} {
+export function subdivideLot(
+  options: SubdivideLotOptions,
+): { parentLot: Lot; childLots: Lot[] } {
   const parentLot = store.get(options.lotId);
-  
-  if (!parentLot) {
-    throw new Error(`Lot not found: ${options.lotId}`);
-  }
-
-  if (parentLot.status !== 'active') {
-    throw new Error(`Cannot subdivide lot with status '${parentLot.status}'. Only active lots can be subdivided.`);
-  }
-
-  // Calculate total quantity to subdivide
-  const totalSubdivided = options.subdivisions.reduce(
-    (sum, sub) => sum + sub.quantity,
-    0
-  );
-
-  if (totalSubdivided > parentLot.currentQuantity) {
+  if (!parentLot) throw new Error(`Lot not found: ${options.lotId}`);
+  if (parentLot.status !== "active") {
     throw new Error(
-      `Cannot subdivide ${totalSubdivided} animals from lot with only ${parentLot.currentQuantity} animals`
+      `Cannot subdivide lot with status '${parentLot.status}'.`,
+    );
+  }
+
+  const total = options.subdivisions.reduce((s, x) => s + x.quantity, 0);
+  if (total > parentLot.currentQuantity) {
+    throw new Error(
+      `Cannot subdivide ${total} from lot with ${parentLot.currentQuantity}.`,
     );
   }
 
   const now = new Date();
   const childLots: Lot[] = [];
 
-  // Create each child lot
-  for (const subdivision of options.subdivisions) {
+  for (const sub of options.subdivisions) {
     const childId = generateId();
-    const childCode = `${parentLot.code}${subdivision.codeSuffix || ''}`;
-
-    // Build lineage - child inherits parent's ancestry plus parent
+    const childCode = `${parentLot.code}${sub.codeSuffix ?? ""}`;
     const ancestors = [...parentLot.lineage.ancestors, parentLot.id];
-
-    const childLineage: LotLineage = {
-      lotId: childId,
-      originLotId: parentLot.id,
-      sourceType: 'transfer', // Subdivision is treated as internal transfer
-      subdivisions: [],
-      ancestors,
-      generationDepth: ancestors.length,
-    };
 
     const childLot: Lot = {
       id: childId,
       code: childCode,
-      speciesId: parentLot.speciesId,
+      speciesProfileId: parentLot.speciesProfileId,
       strain: parentLot.strain,
-      sex: subdivision.sex,
-      initialQuantity: subdivision.quantity,
-      currentQuantity: subdivision.quantity,
+      sex: sub.sex,
+      initialQuantity: sub.quantity,
+      currentQuantity: sub.quantity,
       birthDate: parentLot.birthDate,
       acquisitionDate: parentLot.acquisitionDate,
       createdAt: now,
       updatedAt: now,
-      sourceType: 'transfer',
+      sourceType: "transfer",
       originLotId: parentLot.id,
-      status: 'active',
+      status: "active",
       location: parentLot.location,
-      lineage: childLineage,
-      notes: subdivision.notes,
+      lineage: {
+        lotId: childId,
+        originLotId: parentLot.id,
+        sourceType: "transfer",
+        subdivisions: [],
+        ancestors,
+        generationDepth: ancestors.length,
+      },
+      notes: sub.notes,
       tags: parentLot.tags,
       sizeClassId: parentLot.sizeClassId,
       sizeClassName: parentLot.sizeClassName,
@@ -252,292 +184,196 @@ export function subdivideLot(options: SubdivideLotOptions): {
     store.save(childLot);
     childLots.push(childLot);
 
-    // Record subdivision event for child
-    const childEvent: LotLifecycleEvent = {
+    store.addEvent({
       id: generateId(),
       lotId: childId,
-      eventType: 'created',
+      eventType: "created",
       timestamp: now,
-      quantity: subdivision.quantity,
+      quantity: sub.quantity,
       reason: `Created from subdivision of ${parentLot.code}`,
       metadata: {
         parentLotId: parentLot.id,
         parentLotCode: parentLot.code,
-        sex: subdivision.sex,
+        sex: sub.sex,
       },
-    };
-    store.addEvent(childEvent);
+    });
 
-    // Register subdivision relationship in parent's lineage
-    const subdivisionRecord: LotSubdivision = {
+    const subRecord: LotSubdivision = {
       id: generateId(),
       parentLotId: parentLot.id,
       childLotId: childId,
       subdivisionDate: now,
-      quantityAllocated: subdivision.quantity,
-      sex: subdivision.sex,
-      notes: subdivision.notes,
+      quantityAllocated: sub.quantity,
+      sex: sub.sex,
+      notes: sub.notes,
     };
-
-    // Update parent's lineage with this subdivision
-    parentLot.lineage.subdivisions.push(subdivisionRecord);
+    parentLot.lineage.subdivisions.push(subRecord);
   }
 
-  // Update parent lot status and quantity
-  parentLot.status = 'subdivided';
-  parentLot.currentQuantity -= totalSubdivided;
+  parentLot.status = "subdivided";
+  parentLot.currentQuantity -= total;
   parentLot.updatedAt = now;
-
-  // If all animals were subdivided, mark as fully subdivided
-  if (parentLot.currentQuantity === 0) {
-    parentLot.status = 'subdivided';
-  }
-
   store.save(parentLot);
 
-  // Record subdivision event for parent
-  const parentEvent: LotLifecycleEvent = {
+  store.addEvent({
     id: generateId(),
     lotId: parentLot.id,
-    eventType: 'subdivided',
+    eventType: "subdivided",
     timestamp: now,
-    quantity: totalSubdivided,
+    quantity: total,
     reason: `Subdivided into ${childLots.length} child lots`,
     metadata: {
       childLotIds: childLots.map((l) => l.id),
       childLotCodes: childLots.map((l) => l.code),
     },
-  };
-  store.addEvent(parentEvent);
+  });
 
-  return {
-    parentLot,
-    childLots,
-  };
+  return { parentLot, childLots };
 }
 
-/**
- * Get the complete lineage chain for a lot
- * Returns ancestors from oldest to most recent
- */
 export function getLotLineage(lotId: string): LotLineage | null {
-  const lot = store.get(lotId);
-  if (!lot) return null;
-  return lot.lineage;
+  return store.get(lotId)?.lineage ?? null;
 }
 
-/**
- * Get the full ancestry chain (all ancestor lots)
- */
 export function getLotAncestors(lotId: string): Lot[] {
   const lot = store.get(lotId);
   if (!lot) return [];
-
   const ancestors: Lot[] = [];
-  let currentOriginId = lot.lineage.originLotId;
-
-  while (currentOriginId) {
-    const ancestor = store.get(currentOriginId);
+  let originId = lot.lineage.originLotId;
+  while (originId) {
+    const ancestor = store.get(originId);
     if (!ancestor) break;
     ancestors.push(ancestor);
-    currentOriginId = ancestor.lineage.originLotId;
+    originId = ancestor.lineage.originLotId;
   }
-
-  // Reverse to get oldest first
   return ancestors.reverse();
 }
 
-/**
- * Get all descendant lots (children, grandchildren, etc.)
- */
 export function getLotDescendants(lotId: string): Lot[] {
-  const lot = store.get(lotId);
-  if (!lot) return [];
-
-  const descendants: Lot[] = [];
-  const toVisit = [lotId];
-
-  while (toVisit.length > 0) {
-    const currentId = toVisit.pop()!;
-    const currentLot = store.get(currentId);
-    if (!currentLot) continue;
-
-    // Find direct children
-    for (const allLot of store.getAll()) {
-      if (allLot.lineage.originLotId === currentId) {
-        descendants.push(allLot);
-        toVisit.push(allLot.id);
+  const out: Lot[] = [];
+  const stack = [lotId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    for (const lot of store.getAll()) {
+      if (lot.lineage.originLotId === id) {
+        out.push(lot);
+        stack.push(lot.id);
       }
     }
   }
-
-  return descendants;
+  return out;
 }
 
-/**
- * Get the complete lifecycle history for a lot
- */
 export function getLotLifecycle(lotId: string): LotLifecycleEvent[] {
   return store.getEvents(lotId);
 }
 
-/**
- * Get all active lots (not subdivided, sold, retired, or deceased)
- */
 export function getActiveLots(): Lot[] {
-  return store.getAll().filter((lot) => lot.status === 'active');
+  return store.getAll().filter((l) => l.status === "active");
 }
 
-/**
- * Get lots matching specific filters
- */
 export function queryLots(filters: LotQueryFilters): Lot[] {
   return store.getAll().filter((lot) => {
-    // Status filter
     if (filters.status) {
-      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
-      if (!statuses.includes(lot.status)) return false;
+      const s = Array.isArray(filters.status) ? filters.status : [filters.status];
+      if (!s.includes(lot.status)) return false;
     }
-
-    // Species ID filter
-    if (filters.speciesId) {
-      const speciesIds = Array.isArray(filters.speciesId) ? filters.speciesId : [filters.speciesId];
-      if (!speciesIds.includes(lot.speciesId)) return false;
+    if (filters.speciesProfileId) {
+      const ids = Array.isArray(filters.speciesProfileId)
+        ? filters.speciesProfileId
+        : [filters.speciesProfileId];
+      if (!ids.includes(lot.speciesProfileId)) return false;
     }
-
-    // Sex filter
     if (filters.sex) {
-      const sexes = Array.isArray(filters.sex) ? filters.sex : [filters.sex];
-      if (!sexes.includes(lot.sex)) return false;
+      const sx = Array.isArray(filters.sex) ? filters.sex : [filters.sex];
+      if (!sx.includes(lot.sex)) return false;
     }
-
-    // Source type filter
-    if (filters.sourceType && lot.sourceType !== filters.sourceType) {
+    if (filters.sourceType && lot.sourceType !== filters.sourceType) return false;
+    if (filters.includeSubdivided === false && lot.status === "subdivided") {
       return false;
     }
-
-    // Include subdivided filter
-    if (filters.includeSubdivided === false && lot.status === 'subdivided') {
-      return false;
-    }
-
     return true;
   });
 }
 
-/**
- * Update lot status
- */
-export function updateLotStatus(lotId: string, newStatus: LotStatus, reason?: string): Lot | null {
+export function updateLotStatus(
+  lotId: string,
+  newStatus: LotStatus,
+  reason?: string,
+): Lot | null {
   const lot = store.get(lotId);
   if (!lot) return null;
-
   const oldStatus = lot.status;
   lot.status = newStatus;
   lot.updatedAt = new Date();
   store.save(lot);
-
-  // Record status change event
-  const event: LotLifecycleEvent = {
+  store.addEvent({
     id: generateId(),
     lotId,
-    eventType: 'status_changed',
+    eventType: "status_changed",
     timestamp: new Date(),
-    reason: reason || `Status changed from ${oldStatus} to ${newStatus}`,
-    metadata: {
-      oldStatus,
-      newStatus,
-    },
-  };
-  store.addEvent(event);
-
+    reason: reason ?? `Status: ${oldStatus} → ${newStatus}`,
+    metadata: { oldStatus, newStatus },
+  });
   return lot;
 }
 
-/**
- * Add animals to a lot (e.g., from breeding, transfer in)
- */
-export function addAnimalsToLot(lotId: string, quantity: number, reason?: string): Lot | null {
+export function addAnimalsToLot(
+  lotId: string,
+  quantity: number,
+  reason?: string,
+): Lot | null {
   const lot = store.get(lotId);
   if (!lot) return null;
-
-  if (lot.status !== 'active') {
+  if (lot.status !== "active") {
     throw new Error(`Cannot add animals to lot with status '${lot.status}'`);
   }
-
   lot.currentQuantity += quantity;
   lot.updatedAt = new Date();
   store.save(lot);
-
-  // Record event
-  const event: LotLifecycleEvent = {
+  store.addEvent({
     id: generateId(),
     lotId,
-    eventType: 'animals_added',
+    eventType: "animals_added",
     timestamp: new Date(),
     quantity,
-    reason: reason || 'Animals added to lot',
-  };
-  store.addEvent(event);
-
+    reason: reason ?? "Animals added",
+  });
   return lot;
 }
 
-/**
- * Remove animals from a lot (e.g., mortality, transfer out)
- */
 export function removeAnimalsFromLot(
   lotId: string,
   quantity: number,
   reason?: string,
-  isMortality: boolean = false
+  isMortality = false,
 ): Lot | null {
   const lot = store.get(lotId);
   if (!lot) return null;
-
-  if (lot.status !== 'active') {
-    throw new Error(`Cannot remove animals from lot with status '${lot.status}'`);
+  if (lot.status !== "active") {
+    throw new Error(`Cannot remove from lot with status '${lot.status}'`);
   }
-
-  if (quantity > lot.currentQuantity) {
-    throw new Error(`Cannot remove ${quantity} animals from lot with only ${lot.currentQuantity} animals`);
-  }
-
-  lot.currentQuantity -= quantity;
+  lot.currentQuantity = Math.max(0, lot.currentQuantity - quantity);
   lot.updatedAt = new Date();
-
-  // Auto-mark as deceased if all animals are gone due to mortality
-  if (isMortality && lot.currentQuantity === 0) {
-    lot.status = 'deceased';
-  }
-
   store.save(lot);
-
-  // Record event
-  const event: LotLifecycleEvent = {
+  store.addEvent({
     id: generateId(),
     lotId,
-    eventType: isMortality ? 'mortality' : 'animals_removed',
+    eventType: isMortality ? "mortality" : "animals_removed",
     timestamp: new Date(),
     quantity,
-    reason: reason || (isMortality ? 'Mortality event' : 'Animals removed from lot'),
-  };
-  store.addEvent(event);
-
+    reason: reason ?? (isMortality ? "Mortality" : "Removed"),
+  });
   return lot;
 }
 
-/**
- * Get lot summary (lightweight representation)
- */
 export function getLotSummary(lotId: string): LotSummary | null {
   const lot = store.get(lotId);
   if (!lot) return null;
-
   return {
     id: lot.id,
     code: lot.code,
-    speciesId: lot.speciesId,
+    speciesProfileId: lot.speciesProfileId,
     sex: lot.sex,
     currentQuantity: lot.currentQuantity,
     status: lot.status,
@@ -547,61 +383,29 @@ export function getLotSummary(lotId: string): LotSummary | null {
   };
 }
 
-/**
- * Get statistics about the lot population
- */
 export function getLotStatistics(): {
   totalLots: number;
   activeLots: number;
   totalAnimals: number;
-  bySpeciesId: Record<string, number>;
-  byStatus: Record<string, number>;
+  bySpeciesProfile: Record<SpeciesProfileId, number>;
+  byStatus: Record<LotStatus, number>;
 } {
-  const allLots = store.getAll();
-  const activeLots = allLots.filter((l) => l.status === 'active');
-
-  const bySpeciesId: Record<string, number> = {};
+  const all = store.getAll();
+  const active = all.filter((l) => l.status === "active");
+  const bySpeciesProfile: Record<string, number> = {};
   const byStatus: Record<string, number> = {};
-
-  for (const lot of allLots) {
-    bySpeciesId[lot.speciesId] = (bySpeciesId[lot.speciesId] || 0) + lot.currentQuantity;
-    byStatus[lot.status] = (byStatus[lot.status] || 0) + 1;
+  for (const lot of active) {
+    bySpeciesProfile[lot.speciesProfileId] =
+      (bySpeciesProfile[lot.speciesProfileId] ?? 0) + lot.currentQuantity;
   }
-
+  for (const lot of all) {
+    byStatus[lot.status] = (byStatus[lot.status] ?? 0) + 1;
+  }
   return {
-    totalLots: allLots.length,
-    activeLots: activeLots.length,
-    totalAnimals: activeLots.reduce((sum, l) => sum + l.currentQuantity, 0),
-    bySpeciesId,
-    byStatus,
+    totalLots: all.length,
+    activeLots: active.length,
+    totalAnimals: active.reduce((s, l) => s + l.currentQuantity, 0),
+    bySpeciesProfile,
+    byStatus: byStatus as Record<LotStatus, number>,
   };
-}
-
-/**
- * Export the store for testing/debugging
- */
-export function _getStore(): LotStore {
-  return store;
-}
-
-/**
- * Get a single lot by ID (convenience wrapper over the store).
- */
-export function getLotById(id: string): Lot | undefined {
-  return store.getLot(id);
-}
-
-/**
- * Register mortality for a lot.
- * Semantic alias for removeAnimalsFromLot with isMortality=true.
- */
-export function registerMortality(options: {
-  lotId: string;
-  quantity: number;
-  reason?: string;
-  notes?: string;
-}): { lot: Lot } {
-  const lot = removeAnimalsFromLot(options.lotId, options.quantity, options.reason || options.notes, true);
-  if (!lot) throw new Error(`Lot not found: ${options.lotId}`);
-  return { lot };
 }

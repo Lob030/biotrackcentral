@@ -20,10 +20,12 @@ const qty = z.number().int().positive().max(100_000);
 const sex = z.enum(["mixed", "male", "female"]);
 const sourceType = z.enum(["internal_birth", "external_purchase", "transfer"]);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const uuid = z.string().uuid();
 
 export const IntentSchemas = {
   CREATE_LOT: z.object({
-    speciesId: z.string().trim().min(1).max(60),
+    speciesProfileId: uuid,
+    speciesName: z.string().trim().max(120).optional(),
     strain: z.string().trim().max(120).optional(),
     sex,
     quantity: qty,
@@ -92,7 +94,8 @@ export const TOOL_PARAMS: Record<IntentName, Record<string, unknown>> = {
   CREATE_LOT: {
     type: "object",
     properties: {
-      speciesId: { type: "string" },
+      speciesProfileId: { type: "string", format: "uuid", description: "UUID of workspace_species_profiles row" },
+      speciesName: { type: "string", description: "User-spoken species name (used for disambiguation only, never for execution)" },
       strain: { type: "string" },
       sex: { type: "string", enum: ["mixed", "male", "female"] },
       quantity: { type: "integer", minimum: 1 },
@@ -102,7 +105,7 @@ export const TOOL_PARAMS: Record<IntentName, Record<string, unknown>> = {
       notes: { type: "string" },
       confidence: { type: "string", enum: ["high", "medium", "low"] },
     },
-    required: ["speciesId", "sex", "quantity", "sourceType", "confidence"],
+    required: ["speciesProfileId", "sex", "quantity", "sourceType", "confidence"],
   },
   SUBDIVIDE_LOT: {
     type: "object",
