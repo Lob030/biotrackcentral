@@ -57,8 +57,8 @@ export interface WorkspaceSpeciesProfile {
   id: string;
   workspaceId: string;
   
-  // Species reference
-  speciesId: string;           // Biological species identifier (e.g., 'mus_musculus')
+  // Taxonomy reference (used for cross-workspace analytics aggregation)
+  taxonomyKey: string;         // Lower-cased canonical taxonomy code (e.g., 'asf', 'tenebrio')
   speciesName: string;         // Display name (e.g., 'Mouse', 'Rat', 'Hamster')
   scientificName?: string;     // Scientific name (e.g., 'Mus musculus')
   
@@ -257,7 +257,7 @@ export interface SpeciesPricingProfile {
 export const ASF_STARTER_BLUEPRINT: WorkspaceSpeciesProfile = {
   id: 'starter_asf',
   workspaceId: '', // Will be set when instantiated
-  speciesId: 'mastomys_natalensis',
+  taxonomyKey: 'asf',
   speciesName: 'ASF',
   scientificName: 'Mastomys natalensis',
   operationalName: 'ASF',
@@ -381,7 +381,7 @@ export const ASF_DEFAULT_OPERATIONAL_SETTINGS: Omit<SpeciesOperationalSettings, 
 export const TENEBRIO_STARTER_BLUEPRINT: WorkspaceSpeciesProfile = {
   id: 'starter_tenebrio',
   workspaceId: '', // Set at workspace instantiation
-  speciesId: 'tenebrio_molitor',
+  taxonomyKey: 'tenebrio',
   speciesName: 'Tenebrios',
   scientificName: 'Tenebrio molitor',
   operationalName: 'Tenebrios',
@@ -494,7 +494,7 @@ export const TENEBRIO_DEFAULT_OPERATIONAL_SETTINGS: Omit<SpeciesOperationalSetti
  */
 export interface SpeciesProfileFilters {
   workspaceId: string;
-  speciesId?: string | string[];
+  taxonomyKey?: string | string[];
   isActive?: boolean;
   includeInactive?: boolean;
   includeBlueprints?: boolean;

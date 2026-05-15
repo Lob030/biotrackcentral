@@ -70,7 +70,7 @@ function buildTools() {
 }
 
 async function resolveLote(sb: SupabaseClient, ref: string) {
-  const { data } = await sb.from("lotes").select("id, codigo, cantidad_actual, caja_id, especie").ilike("codigo", ref);
+  const { data } = await sb.from("lotes").select("id, codigo, cantidad_actual, caja_id, species_profile_id").ilike("codigo", ref);
   return data ?? [];
 }
 async function resolveCaja(sb: SupabaseClient, ref: string) {
@@ -122,7 +122,7 @@ async function buildPreview(
         options: matches.map((m) => ({
           id: m.id,
           label: m.codigo ?? m.id,
-          hint: `${m.especie} · ${m.cantidad_actual ?? 0} animales`,
+          hint: `${m.cantidad_actual ?? 0} (profile ${m.species_profile_id?.slice(0, 8) ?? '—'})`,
         })),
       });
       return null;
@@ -229,8 +229,9 @@ async function buildPreview(
       break;
     }
     case "CREATE_LOT": {
-      const a = args as { speciesId: string; quantity: number; cageCode?: string };
-      result.preview.lines.push(`Crear lote: ${a.speciesId}, ${a.quantity} animales`);
+      const a = args as { speciesProfileId: string; speciesName?: string; quantity: number; cageCode?: string };
+      const label = a.speciesName ? `${a.speciesName} (${a.speciesProfileId.slice(0, 8)})` : a.speciesProfileId;
+      result.preview.lines.push(`Crear lote: ${label}, ${a.quantity}`);
       if (a.cageCode) {
         const cage = await resolveCageByCode("cageCode", a.cageCode);
         if (cage) result.resolved.cageId = cage.id;
@@ -293,54 +294,51 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Workspace inválido" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Fetch workspace species context
+    // Fetch workspace species catalog (canonical runtime species reference)
     const { data: speciesProfiles } = await supabase
       .from("workspace_species_profiles")
-      .select("id, species_name, operational_name")
+      .select("id, code, display_name, taxonomy_key")
       .eq("workspace_id", workspace_id)
       .eq("is_active", true);
 
     const { data: sizeClasses } = await supabase
       .from("species_size_classes")
-      .select("id, species_profile_id, name, code, min_age_days, max_age_days, sale_price, display_order")
-      .eq("workspace_id", workspace_id)
-      .eq("is_active", true)
-      .order("display_order");
+      .select("id, species_profile_id, code, display_name, min_age_days, max_age_days, display_order");
 
-    // Fetch live availability per classification
+    // Resolve quantity_unit per profile
+    const profileIds = (speciesProfiles ?? []).map(p => p.id);
+    const { data: opSettings } = profileIds.length
+      ? await supabase
+          .from("species_operational_settings")
+          .select("species_profile_id, quantity_unit")
+          .in("species_profile_id", profileIds)
+      : { data: [] as Array<{ species_profile_id: string; quantity_unit: string }> };
+    const quantityUnitByProfile: Record<string, string> = Object.fromEntries(
+      (opSettings ?? []).map((s: any) => [s.species_profile_id, s.quantity_unit ?? "individuals"]),
+    );
+
+    // Live availability per (size_class)
     const { data: activeLots } = await supabase
       .from("lotes")
-      .select("id, codigo, especie, size_class_id, cantidad_actual, fecha_nacimiento, estado, tipo")
-      .eq("workspace_id", workspace_id)
+      .select("id, codigo, species_profile_id, size_class_id, cantidad_actual, fecha_nacimiento, estado, tipo")
+      .eq("organization_id", (await supabase.from("workspaces").select("organization_id").eq("id", workspace_id).maybeSingle()).data?.organization_id ?? "")
       .eq("estado", "activo")
       .in("tipo", ["nacimiento", "engorda"]);
 
-    const { data: activeReservations } = await supabase
-      .from("inventory_reservations")
-      .select("species_profile_id, size_class_id, remaining_quantity")
-      .eq("workspace_id", workspace_id)
-      .eq("status", "active");
-
-    // Build availability context per classification
     const availabilityByClass: Record<string, number> = {};
     for (const lot of (activeLots ?? [])) {
       if (!lot.size_class_id) continue;
       availabilityByClass[lot.size_class_id] = (availabilityByClass[lot.size_class_id] ?? 0) + (lot.cantidad_actual ?? 0);
     }
-    // Subtract reservations
-    for (const res of (activeReservations ?? [])) {
-      if (!res.size_class_id) continue;
-      availabilityByClass[res.size_class_id] = Math.max(0, (availabilityByClass[res.size_class_id] ?? 0) - (res.remaining_quantity ?? 0));
-    }
 
     const speciesContext = (speciesProfiles ?? []).map(p => {
+      const unit = quantityUnitByProfile[p.id] ?? "individuals";
       const pClasses = (sizeClasses ?? []).filter((sc: any) => sc.species_profile_id === p.id);
       const classLines = pClasses.map((sc: any) => {
         const available = availabilityByClass[sc.id] ?? 0;
-        const price = sc.sale_price ? `$${sc.sale_price}` : "sin precio";
-        return `  · ${sc.name}${sc.code ? ` [${sc.code}]` : ""}: ${available} disponibles (${price})`;
+        return `  · ${sc.display_name}${sc.code ? ` [${sc.code}]` : ""}: ${available} ${unit} (size_class_id=${sc.id})`;
       }).join("\n");
-      return `- ${p.operational_name} (${p.species_name}):\n${classLines || "  · Sin clasificaciones"}`;
+      return `- ${p.display_name} [code=${p.code}, taxonomy=${p.taxonomy_key}, profileId=${p.id}, unit=${unit}]:\n${classLines || "  · Sin clasificaciones"}`;
     }).join("\n");
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

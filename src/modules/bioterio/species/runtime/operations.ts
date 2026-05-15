@@ -283,16 +283,16 @@ export function updateSpeciesProfile(
  * Get species profiles for a workspace
  */
 export function getSpeciesProfiles(filters: SpeciesProfileFilters): WorkspaceSpeciesProfile[] {
-  const { workspaceId, speciesId, isActive, includeInactive, includeBlueprints } = filters;
+  const { workspaceId, taxonomyKey, isActive, includeInactive, includeBlueprints } = filters;
   
   return store.getAllProfiles().filter((profile) => {
     // Workspace filter (required)
     if (profile.workspaceId !== workspaceId) return false;
     
-    // Species ID filter
-    if (speciesId) {
-      const speciesIds = Array.isArray(speciesId) ? speciesId : [speciesId];
-      if (!speciesIds.includes(profile.speciesId)) return false;
+    // Taxonomy key filter (cross-workspace aggregation)
+    if (taxonomyKey) {
+      const keys = Array.isArray(taxonomyKey) ? taxonomyKey : [taxonomyKey];
+      if (!keys.includes(profile.taxonomyKey)) return false;
     }
     
     // Active status filter
