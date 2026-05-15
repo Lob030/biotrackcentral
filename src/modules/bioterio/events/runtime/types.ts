@@ -136,7 +136,14 @@ export interface EventMetadata {
   // References
   cageCode?: string;
   lotCode?: string;
-  speciesId?: string;
+  speciesProfileId?: string;
+  /** Immutable snapshot of the species profile at event time — preserves history across renames. */
+  speciesProfileSnapshot?: {
+    speciesProfileId: string;
+    code: string;
+    displayName: string;
+    taxonomyKey?: string;
+  };
   strain?: string;
   
   // Environmental readings
