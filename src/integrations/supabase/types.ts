@@ -328,41 +328,91 @@ export type Database = {
           },
         ]
       }
+      growth_classifications: {
+        Row: {
+          code: string
+          created_at: string
+          display_name: string
+          display_order: number
+          id: string
+          max_value: number | null
+          metadata: Json
+          min_value: number | null
+          rule_type: string
+          species_profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          display_name: string
+          display_order?: number
+          id?: string
+          max_value?: number | null
+          metadata?: Json
+          min_value?: number | null
+          rule_type?: string
+          species_profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          display_name?: string
+          display_order?: number
+          id?: string
+          max_value?: number | null
+          metadata?: Json
+          min_value?: number | null
+          rule_type?: string
+          species_profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_classifications_species_profile_id_fkey"
+            columns: ["species_profile_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_species_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lineas_geneticas: {
         Row: {
           color_etiqueta: string | null
           created_at: string
-          especie: Database["public"]["Enums"]["especie_type"]
           fecha_registro: string | null
           id: string
           nombre: string
           notas: string | null
           organization_id: string
           origen: string | null
+          species_profile_id: string
           updated_at: string
         }
         Insert: {
           color_etiqueta?: string | null
           created_at?: string
-          especie: Database["public"]["Enums"]["especie_type"]
           fecha_registro?: string | null
           id?: string
           nombre: string
           notas?: string | null
           organization_id: string
           origen?: string | null
+          species_profile_id: string
           updated_at?: string
         }
         Update: {
           color_etiqueta?: string | null
           created_at?: string
-          especie?: Database["public"]["Enums"]["especie_type"]
           fecha_registro?: string | null
           id?: string
           nombre?: string
           notas?: string | null
           organization_id?: string
           origen?: string | null
+          species_profile_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -371,6 +421,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lineas_geneticas_species_profile_id_fkey"
+            columns: ["species_profile_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_species_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -424,7 +481,6 @@ export type Database = {
           cantidad_inicial: number | null
           codigo: string | null
           created_at: string
-          especie: Database["public"]["Enums"]["especie_type"]
           estado: Database["public"]["Enums"]["lote_estado"]
           fecha_introduccion_caja: string | null
           fecha_nacimiento: string
@@ -437,6 +493,7 @@ export type Database = {
           notas: string | null
           organization_id: string
           sexo: Database["public"]["Enums"]["lote_sexo"] | null
+          species_profile_id: string
           tipo: Database["public"]["Enums"]["lote_tipo"]
           updated_at: string
         }
@@ -446,7 +503,6 @@ export type Database = {
           cantidad_inicial?: number | null
           codigo?: string | null
           created_at?: string
-          especie: Database["public"]["Enums"]["especie_type"]
           estado?: Database["public"]["Enums"]["lote_estado"]
           fecha_introduccion_caja?: string | null
           fecha_nacimiento: string
@@ -459,6 +515,7 @@ export type Database = {
           notas?: string | null
           organization_id: string
           sexo?: Database["public"]["Enums"]["lote_sexo"] | null
+          species_profile_id: string
           tipo?: Database["public"]["Enums"]["lote_tipo"]
           updated_at?: string
         }
@@ -468,7 +525,6 @@ export type Database = {
           cantidad_inicial?: number | null
           codigo?: string | null
           created_at?: string
-          especie?: Database["public"]["Enums"]["especie_type"]
           estado?: Database["public"]["Enums"]["lote_estado"]
           fecha_introduccion_caja?: string | null
           fecha_nacimiento?: string
@@ -481,6 +537,7 @@ export type Database = {
           notas?: string | null
           organization_id?: string
           sexo?: Database["public"]["Enums"]["lote_sexo"] | null
+          species_profile_id?: string
           tipo?: Database["public"]["Enums"]["lote_tipo"]
           updated_at?: string
         }
@@ -511,6 +568,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_species_profile_id_fkey"
+            columns: ["species_profile_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_species_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -734,6 +798,166 @@ export type Database = {
           },
         ]
       }
+      species_operational_settings: {
+        Row: {
+          created_at: string
+          default_breeding_cycle_days: number | null
+          id: string
+          lot_tracking_mode: string
+          quantity_unit: string
+          settings: Json
+          species_profile_id: string
+          track_breeding: boolean
+          track_mortality: boolean
+          updated_at: string
+          weaning_age_days: number | null
+        }
+        Insert: {
+          created_at?: string
+          default_breeding_cycle_days?: number | null
+          id?: string
+          lot_tracking_mode?: string
+          quantity_unit?: string
+          settings?: Json
+          species_profile_id: string
+          track_breeding?: boolean
+          track_mortality?: boolean
+          updated_at?: string
+          weaning_age_days?: number | null
+        }
+        Update: {
+          created_at?: string
+          default_breeding_cycle_days?: number | null
+          id?: string
+          lot_tracking_mode?: string
+          quantity_unit?: string
+          settings?: Json
+          species_profile_id?: string
+          track_breeding?: boolean
+          track_mortality?: boolean
+          updated_at?: string
+          weaning_age_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "species_operational_settings_species_profile_id_fkey"
+            columns: ["species_profile_id"]
+            isOneToOne: true
+            referencedRelation: "workspace_species_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      species_pricing_profiles: {
+        Row: {
+          base_price: number
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean
+          pricing_rules: Json
+          size_class_id: string | null
+          species_profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          base_price?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          pricing_rules?: Json
+          size_class_id?: string | null
+          species_profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          base_price?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          pricing_rules?: Json
+          size_class_id?: string | null
+          species_profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "species_pricing_profiles_size_class_id_fkey"
+            columns: ["size_class_id"]
+            isOneToOne: false
+            referencedRelation: "species_size_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "species_pricing_profiles_species_profile_id_fkey"
+            columns: ["species_profile_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_species_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      species_size_classes: {
+        Row: {
+          code: string
+          created_at: string
+          display_name: string
+          display_order: number
+          id: string
+          is_default: boolean
+          is_sale_eligible: boolean
+          max_age_days: number | null
+          max_weight_g: number | null
+          metadata: Json
+          min_age_days: number | null
+          min_weight_g: number | null
+          species_profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          display_name: string
+          display_order?: number
+          id?: string
+          is_default?: boolean
+          is_sale_eligible?: boolean
+          max_age_days?: number | null
+          max_weight_g?: number | null
+          metadata?: Json
+          min_age_days?: number | null
+          min_weight_g?: number | null
+          species_profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          display_name?: string
+          display_order?: number
+          id?: string
+          is_default?: boolean
+          is_sale_eligible?: boolean
+          max_age_days?: number | null
+          max_weight_g?: number | null
+          metadata?: Json
+          min_age_days?: number | null
+          min_weight_g?: number | null
+          species_profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "species_size_classes_species_profile_id_fkey"
+            columns: ["species_profile_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_species_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -755,6 +979,56 @@ export type Database = {
         }
         Relationships: []
       }
+      workspace_species_profiles: {
+        Row: {
+          capability_profile: Json
+          code: string
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          scientific_name: string | null
+          taxonomy_class: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          capability_profile?: Json
+          code: string
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          scientific_name?: string | null
+          taxonomy_class?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          capability_profile?: Json
+          code?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          scientific_name?: string | null
+          taxonomy_class?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_species_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           animal_class: string | null
@@ -762,6 +1036,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          organization_id: string
           purpose: string
           species: string | null
           subtype: string | null
@@ -774,6 +1049,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          organization_id: string
           purpose: string
           species?: string | null
           subtype?: string | null
@@ -786,13 +1062,22 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          organization_id?: string
           purpose?: string
           species?: string | null
           subtype?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -807,6 +1092,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_owns_species_profile: {
+        Args: { _profile_id: string }
+        Returns: boolean
+      }
+      user_owns_workspace: { Args: { _workspace_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "trabajador" | "super_admin"
@@ -818,7 +1108,6 @@ export type Database = {
         | "laboratorio"
         | "centro_investigacion"
         | "veterinario"
-      especie_type: "ASF" | "Raton" | "Rata"
       lote_estado: "activo" | "dividido" | "finalizado"
       lote_evento_tipo:
         | "mortalidad"
@@ -973,7 +1262,6 @@ export const Constants = {
         "centro_investigacion",
         "veterinario",
       ],
-      especie_type: ["ASF", "Raton", "Rata"],
       lote_estado: ["activo", "dividido", "finalizado"],
       lote_evento_tipo: [
         "mortalidad",
